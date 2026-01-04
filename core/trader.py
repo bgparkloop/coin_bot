@@ -596,7 +596,7 @@ class Bot():
                 self.trader.update(target_symbol, key='position_list', value=[])
                 
 
-        if check or old_balance != await self.get_balance():
+        if check or old_balance != await self.get_balance() and check:
             print(check, old_balance, await self.get_balance())
             print()
             msg = await self.status_msg()
