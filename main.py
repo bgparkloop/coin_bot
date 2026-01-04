@@ -21,6 +21,8 @@ async def periodic_task(interval):
 # 주기적으로 비동기 함수 실행
 @app.on_event("startup")
 async def on_startup():
+    msg = self.bot.start_msg()
+    await self.bot.post_message(msg)
     # 5초마다 실행
     asyncio.create_task(periodic_task(15))
     # asyncio.create_task(independent_task())

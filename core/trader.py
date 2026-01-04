@@ -72,9 +72,6 @@ class Bot():
             # self.updater.start_polling(timeout=10)
             
             self.telegram_chk = True
-
-            msg = self.start_msg()
-            asyncio.run(self.post_message(msg))
         
 
     # ========== OKX API ===================
