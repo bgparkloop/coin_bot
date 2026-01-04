@@ -168,7 +168,7 @@ class Bot():
         return positions, indexed
 
     async def check_positions(self, t_symbol=None):
-        positions, indexed = self.fetch_positions()
+        positions, indexed = await self.fetch_positions()
 
         roe = []
         pnl = []
