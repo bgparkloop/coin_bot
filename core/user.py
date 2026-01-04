@@ -56,7 +56,7 @@ class UserData():
 
         if target_symbol is None:
             setattr(self, key, value)
-
+        else:
             assert key in self.data[target_symbol], f"{target_symbol} - Error! Key Not Founded"
             self.data[target_symbol][key] = value
 
