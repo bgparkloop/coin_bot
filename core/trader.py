@@ -11,7 +11,7 @@ from pytz import timezone
 from datetime import datetime
 import pandas as pd
 import traceback
-# import telegram
+import telegram
 # from telegram.ext import *
 from telegram import Bot, Update
 from telegram.ext import (
