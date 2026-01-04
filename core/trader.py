@@ -539,7 +539,7 @@ class Bot():
         # bak_info = copy.deepcopy(self.get_balance())
         old_balance = self.trader.get_info(None, 'balance')
 
-        positions = await self.api.fetch_positions()
+        positions = self.api.fetch_positions()
         indexed = self.api.index_by(positions, 'contracts')
 
         # print('indexed : ', indexed)
