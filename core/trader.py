@@ -539,7 +539,7 @@ class Bot():
         # bak_info = copy.deepcopy(self.get_balance())
         old_balance = self.trader.get_info(None, 'balance')
 
-        positions = self.api.fetch_positions()
+        positions = await self.api.fetch_positions()
         indexed = self.api.index_by(positions, 'contracts')
 
         # print('indexed : ', indexed)
@@ -596,8 +596,8 @@ class Bot():
                 self.trader.update(target_symbol, key='position_list', value=[])
                 
 
-        if check or old_balance != self.get_balance():
-            print(check, old_balance, self.get_balance())
+        if check or old_balance != await self.get_balance():
+            print(check, old_balance, await self.get_balance())
             print()
             msg = await self.status_msg()
 
