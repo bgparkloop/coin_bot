@@ -774,7 +774,7 @@ class Bot():
     def start(self):
         self.app.run_polling()
 
-    def msg_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def msg_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_text = update.message.text
         tokens = user_text.split()
         print(tokens)
