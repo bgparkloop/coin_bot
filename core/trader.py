@@ -597,18 +597,9 @@ class Bot():
                 
 
         if check or old_balance != self.get_balance():
-            # if self.config['TRADE_OPTION']['margin_mode'] == 'cross' and check:
-            #     print(check, old_balance, self.get_balance())
-            #     print()
-            #     msg = self.status_msg()
-
-            # elif self.config['TRADE_OPTION']['margin_mode'] == 'isolated':
-            #     print(check, old_balance, self.get_balance())
-            #     print()
-            #     msg = self.status_msg()
             print(check, old_balance, self.get_balance())
             print()
-            msg = self.status_msg()
+            msg = await self.status_msg()
 
             self.set_balance()
             return msg
@@ -683,7 +674,7 @@ class Bot():
 
         return text
 
-    def status_msg(self):
+    async def status_msg(self):
         text = "============================================\n"
        
         if self.go_trade:
@@ -713,7 +704,7 @@ class Bot():
                 unpnl, (unpnl/total_sum) * 100,
             )
 
-        roe, pnl = asyncio.run(self.check_positions())
+        roe, pnl = await self.check_positions())
         
         text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
