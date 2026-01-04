@@ -217,6 +217,8 @@ class Bot():
     """
         트레이딩 관련 함수들
     """
+    def sleep(self, sleep_time):
+        time.sleep(sleep_time)
 
     async def trade(self, symbol, check_pos, trade_vol, cur_close):
         if not self.go_trade:
