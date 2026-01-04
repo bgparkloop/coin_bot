@@ -769,73 +769,55 @@ class Bot():
         tokens = user_text.split()
         print(tokens)
 
-        # if tokens[0].lower() == 'set':
-        #     for ti, target_symbol in enumerate(self.trader.get_target_symbols()):
-        #         target_coin = self.symbol_parser(target_symbol)
-                
-        #         if tokens[1].lower() in target_coin.lower():
-        #             if tokens[2].lower() == 'lev':
-        #                 lev = float(tokens[3])
-        #                 self.update(target_symbol, key='leverage', value=lev)
-                    
-        #             elif tokens[2].lower() == 'ratio':
-        #                 ratio = float(tokens[3])
-        #                 self.update(target_symbol, key='ratio', value=ratio)
+        if tokens[0].lower() == 'set':
+            for ti, target_symbol in enumerate(self.trader.get_target_symbols()):
+                if tokens[1].lower() in target_symbol.lower():
+                    if tokens[2].lower() == 'lev':
+                        lev = float(tokens[3])
+                        self.trader.update(target_symbol, key='leverage', value=lev)
                         
-        #             elif tokens[2].lower() == 'cnt':
-        #                 cnt = float(tokens[3])
-        #                 self.update(target_symbol, key='max_buy_cnt', value=cnt)
+                    elif tokens[2].lower() == 'cnt':
+                        cnt = float(tokens[3])
+                        self.trader.update(target_symbol, key='max_buy_cnt', value=cnt)
 
-        #             elif tokens[2].lower() == 'mv':
-        #                 cnt = float(tokens[3])
-        #                 min_vol = cnt * 0.1
-        #                 self.update(target_symbol, key='min_vol', value=min_vol)
+                    elif tokens[2].lower() == 'mv':
+                        cnt = float(tokens[3])
+                        min_vol = cnt * 0.1
+                        self.trader.update(target_symbol, key='min_vol', value=min_vol)
 
-        #             elif tokens[2].lower() == 'add':
-        #                 ratio = float(tokens[3])
-        #                 self.update(target_symbol, key='new_buy_roe', value=ratio)
-
-        #                 # if self.target_info[target_coin]['trade_mode'] == 'rsi':
-
-        #     if tokens[1].lower() == 'type':
-        #         self.set_trade_type(int(tokens[2]))
-
-        #     elif tokens[1].lower() == 'mode':
-        #         if tokens[2].lower() in ['all', 'cond', 'rand', 'rsi', 'danta']:
-        #             self.set_trade_mode(tokens[2])
-
-        #     elif tokens[1].lower() == 'short':
-        #         tgt = float(tokens[2])
-        #         if tgt != 0:
-        #             flag = True
-        #         else:
-        #             flag = False
+                    elif tokens[2].lower() == 'add':
+                        ratio = float(tokens[3])
+                        self.trader.update(target_symbol, key='new_buy_roe', value=ratio)
+            
+            if tokens[1].lower() == 'trade':
+                tgt = float(tokens[2])
+                if tgt != 0:
+                    flag = True
+                else:
+                    flag = False
                 
-        #         self.set_use_short(flag)
+                # self.update(target_symbol, key='use_short', value=flag)
+                self.go_trade = flag
 
-        #     # self.init_buy_vol()
-        #     # msg = self.update_positions()
-        #     msg = asyncio.run(self.update_positions())
-        #     self.post_message(msg)
+            elif tokens[1].lower() == 'short':
+                tgt = float(tokens[2])
+                if tgt != 0:
+                    flag = True
+                else:
+                    flag = False
+                
+                self.update(target_symbol, key='use_short', value=flag)
 
-        #     msg = self.status_msg()
-        #     self.post_message(msg)
+            msg = await self.update_positions()
+            await self.post_message(msg)
 
-        # elif tokens[0].lower() == 'show':
-        #     msg = self.status_msg()
-        #     self.post_message(msg)
+            msg = self.status_msg()
+            await self.post_message(msg)
+
+        elif tokens[0].lower() == 'show':
+            msg = self.status_msg()
+            await self.post_message(msg)
 
         # elif tokens[0].lower() == 'help':
         #     msg = self.help_msg()
-        #     self.post_message(msg)
-
-        # elif tokens[0].lower() == 'trade':
-        #     cnt = int(tokens[1])
-
-        #     self.set_trade(cnt)
-        #     # msg = self.update_positions()
-        #     msg = asyncio.run(self.update_positions())
-        #     self.post_message(msg)
-            
-        #     msg = self.status_msg()
         #     self.post_message(msg)
