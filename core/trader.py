@@ -812,11 +812,11 @@ class Bot():
             msg = await self.update_positions()
             await self.post_message(msg)
 
-            msg = self.status_msg()
+            msg = await self.status_msg()
             await self.post_message(msg)
 
         elif tokens[0].lower() == 'show':
-            msg = self.status_msg()
+            msg = await self.status_msg()
             await self.post_message(msg)
 
         # elif tokens[0].lower() == 'help':
