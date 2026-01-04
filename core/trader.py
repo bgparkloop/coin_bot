@@ -635,7 +635,7 @@ class Bot():
         text = "============================================\n"
         text += '현재 시간 : {}\n'.format(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),)
         text += "[자동 거래 시작] USER : [{}]\n".format(
-            self.trader.get_info(None, 'user_name')
+            self.trader.get_info(None, 'user_name'),
             )
 
         total_sum, cur_balance, unpnl = self.get_cur_balance()
@@ -691,7 +691,7 @@ class Bot():
 
         # text += "현재 거래 방법 : [{}]\n".format(self.get_trade_mode())
         text += "[현재 정보] USER : [{}]\n현재 시간 : {}\n".format(
-            self.trader.get_info(None, 'user_name')
+            self.trader.get_info(None, 'user_name'),
             datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),            
         )
 
