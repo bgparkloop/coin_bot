@@ -74,8 +74,7 @@ class Bot():
             self.telegram_chk = True
 
             msg = self.start_msg()
-            print('start msg : ', msg)
-            self.post_message(msg)
+            asyncio.run(self.post_message(msg))
         
 
     # ========== OKX API ===================
