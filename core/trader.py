@@ -762,6 +762,7 @@ class Bot():
             await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
 
     def start(self):
+        print("🔥 polling 시작")
         self.app.run_polling()
 
     async def msg_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
