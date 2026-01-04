@@ -104,7 +104,7 @@ class Bot():
         return total_sum, cur_balance, unpnl
 
     async def fetch_order(self, target_symbol, order_id):
-        return self.api.fetch_order(order_id, target_symbol)åå
+        return self.api.fetch_order(order_id, target_symbol)
 
     async def market_order(self, target_symbol, position='long', vol=0, trade_type='buy', margin_mode='cross'):
         if margin_mode == 'cross':
