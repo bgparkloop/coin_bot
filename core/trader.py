@@ -63,7 +63,7 @@ class Bot():
             self.msgbot = self.app.bot
 
             # 메시지 핸들러 등록
-            self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.msg_handler))
+            self.app.add_handler(MessageHandler(filters.TEXT, self.msg_handler))
 
             # self.msgbot = telegram.Bot(token=self.trader.get_telegram_token())
             # self.updater = Updater(self.trader.get_telegram_token(), use_context=True)

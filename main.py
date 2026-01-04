@@ -6,6 +6,7 @@ from pytz import timezone
 from datetime import datetime
 import traceback
 from telegram import Update
+from telegram.ext import (MessageHandler, filters)
 from core.trader import Bot
 
 
@@ -22,6 +23,9 @@ async def periodic_task(interval):
 # 주기적으로 비동기 함수 실행
 @app.on_event("startup")
 async def on_startup():
+    # 메시지 핸들러 등록
+    bot.app.add_handler(MessageHandler(filters.TEXT, bot.msg_handler))
+
     await bot.app.initialize()
     await bot.app.start()
     msg = bot.start_msg()
@@ -36,6 +40,8 @@ async def on_startup():
 @app.post("/telegram")
 async def telegram_webhook(request: Request):
     data = await request.json()
+
+    print("📨 RAW UPDATE:", data)
 
     update = Update.de_json(data, bot.msgbot)
     await bot.app.process_update(update)
