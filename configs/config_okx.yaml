@@ -1,0 +1,134 @@
+# API INFO
+OKX:
+  API: '112eca64-87d6-491a-942a-8289de76c71d'
+  SECRET_KEY: '4E4FD9C67CF4CA9F6C398721971BC011'
+  PASSWD: 'Fhfhfl12@@'
+  TARGET: ['BTC/USDT:USDT']
+  # TARGET: ['BTC/USDT:USDT', 'ETH/USDT:USDT']
+
+TELEGRAM:
+  TOKEN: "6291205200:AAFzsJNwkavn_cbYwgTUu3vMj43BC3S-kNk"
+  TOKEN2: "6708128827:AAEOMzeqguNh0gZC8Rpz3kixuhXDoIz8x4I"
+  TOKEN3: "7911056918:AAGFzaB-HYZzq1CxAy2YXSS5SVjONEcvaeQ"
+  TOKEN4: "8108277871:AAHYAOjpaZIAByFbV511yf_zMH3Mj3CO5O0"
+  ID: "6266029779"
+
+USER:
+  NAME: "보규"
+  ID: "BG"
+
+TRADE_OPTION:
+  BTC:
+    leverage: 5
+    min_vol: 0.1
+    vol_mul: 3
+    precision: 4
+    map_vol: 100
+    round_num: 4
+    new_buy_roe: 5
+    use_short: False
+
+  ETH:
+    leverage: 2.5
+    min_vol: 0.1
+    vol_mul: 2
+    precision: 2
+    map_vol: 10
+    round_num: 3
+    new_buy_roe: 5
+    use_short: False
+
+SAVE_PATH: './info_okx.json'
+
+# TRADE_OPTION:
+#   timeframe: '15m'
+#   trade_type: 1
+#   trade_mode: 'all'
+#   trade_mode_eth: 'all'
+#   leverage: 10
+#   leverage_alt: 3
+#   leverage_alt2: 3.5
+#   commition: 0.005
+#   max_buy_cnt: 500
+#   use_ratio: 0.1
+#   req_data_cnt: 300
+#   var_thres: 35
+#   new_buy_roe: 10
+#   new_buy_roe_eth: 10
+#   sleep_time: 2
+#   # margin_mode: 'cross'
+#   margin_mode: 'cross'
+#   debug: True
+#   info_json_path: './info_okx.json'
+#   MIN_CONTRACT:
+#     # BTC: 0.1 # 0.001
+#     BTC: 0.1 # 0.001
+#     ETH: 0.1 # 0.01
+#     SOL: 0.01 # 0.1
+#     PEPE: 0.1
+#     BONK: 1
+#     PEOPLE: 1
+#     DOGE: 0.1
+#     SUI: 1
+#     APT: 1
+#     ORDI: 1
+#     ONDO: 1
+#     MEW: 1
+#     LINK: 1
+#     AVAX: 0.1
+#     POPCAT: 1
+#     1INCH: 1
+#   MUL_CONTRACT:
+#     BTC: 2
+#     ETH: 2
+#     SOL: 2
+#     PEPE: 1
+#     BONK: 1
+#     PEOPLE: 1
+#     DOGE: 1
+#     SUI: 1
+#     APT: 1
+#     ORDI: 1
+#     ONDO: 1
+#     MEW: 1
+#     LINK: 1
+#     AVAX: 1
+#     POPCAT: 1
+#     1INCH: 10
+#     MINA: 10
+
+# MAP_COIN_VOLUME:
+#   BTC: 100 # 0.001
+#   ETH: 10 # 0.1
+#   SOL: 1
+#   PEPE: 0.0000001 #100000000
+#   BONK: 0.0001 #100000
+#   PEOPLE: 0.01 #100
+#   DOGE: 0.001
+#   SUI: 1
+#   APT: 1
+#   ORDI: 10
+#   ONDO: 0.1 # 10
+#   MEW: 0.001 # 1000
+#   LINK: 1
+#   AVAX: 1
+#   POPCAT: 0.1 # 10
+#   1INCH: 1 
+
+# MAP_COIN_ROUND_NUM:
+#   BTC: 4
+#   ETH: 3
+#   SOL: 2
+#   PEPE: 1
+#   BONK: 1
+#   PEOPLE: 1
+#   DOGE: 1
+#   SUI: 1
+#   APT: 1
+#   ORDI: 1
+#   ONDO: 1
+#   MEW: 1
+#   LINK: 1
+#   AVAX: 1
+#   POPCAT: 1
+#   1INCH: 1
