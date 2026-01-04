@@ -641,7 +641,7 @@ class Bot():
         total_sum, cur_balance, unpnl = self.get_cur_balance()
 
         text += "현재 계좌\nFree : [{:.2f}/{:.2f} USDT]\n".format(
-            self.trader.get_info(None, 'balance')
+            self.trader.get_info(None, 'balance'),
             cur_balance,
         )
 
@@ -696,7 +696,7 @@ class Bot():
         )
 
         text += "현재 계좌\nFree : [{:.2f}/{:.2f} USDT]\n".format(
-            self.trader.get_info(None, 'balance')
+            self.trader.get_info(None, 'balance'),
             cur_balance,
         )
         
