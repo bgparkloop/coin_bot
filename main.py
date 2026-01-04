@@ -62,8 +62,8 @@ async def receive_webhook(request: Request):
     target_symbol = tokens[1]
 
     if len(tokens) > 2:
-        position_size = float(tokens[2])
-        cur_close = float(tokens[3])
+        position_size = float(tokens[1])
+        cur_close = float(tokens[2])
     else:
         position_size = 1
         cur_close = 0
