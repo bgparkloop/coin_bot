@@ -561,7 +561,7 @@ class Bot():
 
                     self.trader.update(target_symbol, key='avg_buy_price', value=float(entry_price))
                     
-                    div_num = float(self.trader.get_info(symbol, key='map_vol'))
+                    div_num = float(self.trader.get_info(target_symbol, key='map_vol'))
                     belong_vol = float(n_contracts) / div_num
 
                     self.trader.update(target_symbol, key='position', value=pos_side)
