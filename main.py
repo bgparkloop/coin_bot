@@ -5,6 +5,7 @@ import asyncio
 from pytz import timezone
 from datetime import datetime
 import traceback
+from telegram import Update
 from core.trader import Bot
 
 
@@ -26,6 +27,18 @@ async def on_startup():
     # 5초마다 실행
     asyncio.create_task(periodic_task(15))
     # asyncio.create_task(independent_task())
+
+# ==============================
+# Telegram Webhook Endpoint
+# ==============================
+@app.post("/telegram")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+
+    update = Update.de_json(data, bot.msgbot)
+    await bot.app.process_update(update)
+
+    return {"ok": True}
 
 
 # 허용할 IP 주소 목록

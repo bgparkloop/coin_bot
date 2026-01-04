@@ -63,7 +63,7 @@ class Bot():
             self.msgbot = self.app.bot
 
             # 메시지 핸들러 등록
-            self.app.add_handler(MessageHandler(filters.TEXT, self.msg_handler))
+            self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.msg_handler))
 
             # self.msgbot = telegram.Bot(token=self.trader.get_telegram_token())
             # self.updater = Updater(self.trader.get_telegram_token(), use_context=True)
@@ -761,9 +761,9 @@ class Bot():
         if msg is not None:
             await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
 
-    def start(self):
-        print("🔥 polling 시작")
-        self.app.run_polling()
+    # def start(self):
+    #     print("🔥 polling 시작")
+    #     self.app.run_polling()
 
     async def msg_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_text = update.message.text
