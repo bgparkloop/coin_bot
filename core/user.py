@@ -30,19 +30,21 @@ class UserData():
 
         for target in self.config['OKX']['TARGET']:
             if target not in self.data:
-                ticker = target.split('/')[0]
-                options = self.config['TRADE_OPTION'][ticker]
+                self.data[target] = {}
 
-                for k, v in options.items():
-                    self.data[target][k] = v
-                self.data[target]['position'] = None
-                self.data[target]['amt'] = 0
-                self.data[target]['buy_cnt'] = 0
-                self.data[target]['max_buy_cnt'] = 500
-                self.data[target]['avg_buy_price'] = 0
-                self.data[target]['position_list'] = 0
-                self.data[target]['buy_time'] = 0
-                self.data[target]['sell_time'] = 0
+            ticker = target.split('/')[0]
+            options = self.config['TRADE_OPTION'][ticker]
+
+            for k, v in options.items():
+                self.data[target][k] = v
+            self.data[target]['position'] = None
+            self.data[target]['amt'] = 0
+            self.data[target]['buy_cnt'] = 0
+            self.data[target]['max_buy_cnt'] = 500
+            self.data[target]['avg_buy_price'] = 0
+            self.data[target]['position_list'] = 0
+            self.data[target]['buy_time'] = 0
+            self.data[target]['sell_time'] = 0
 
         self.load_info()
 
