@@ -399,12 +399,12 @@ class Bot():
             msg_list = await self.post_trade(order_list)
 
             for idx, msg in enumerate(msg_list):
-                self.post_message(msg)
+                await self.post_message(msg)
                 self.sleep(0.1)
 
             msg = await self.update_positions()
             # msg = asyncio.run(self.update_positions())
-            self.post_message(msg)
+            await self.post_message(msg)
             self.sleep(1)
 
         except (telegram.error.NetworkError, telegram.error.BadRequest, telegram.error.TimedOut):            

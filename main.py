@@ -15,7 +15,7 @@ bot.setup()
 async def periodic_task(interval):
     while True:
         msg = await bot.update_positions()
-        bot.post_message(msg)
+        await bot.post_message(msg)
         await asyncio.sleep(interval)  # interval 초 동안 대기
 
 # 주기적으로 비동기 함수 실행
