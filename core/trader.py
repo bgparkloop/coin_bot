@@ -424,7 +424,7 @@ class Bot():
             
             self.setup()
             msg = self.start_msg()
-            self.post_message(msg)
+            await self.post_message(msg)
             print('New API generated')
 
     async def post_trade(self, order_list):
@@ -441,7 +441,7 @@ class Bot():
             _order = await self.fetch_order(target_symbol, order['id'])
             self.sleep(1)
 
-            target_coin = self.symbol_parser(target_symbol)
+            # target_coin = self.symbol_parser(target_symbol)
             now_str = datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S")
 
             # ==================================================

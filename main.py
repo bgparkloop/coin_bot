@@ -96,7 +96,7 @@ async def receive_webhook(request: Request):
     # 받은 웹훅 데이터를 처리
     if position is None:
         msg = await bot.update_positions()
-        bot.post_message(msg)
+        await bot.post_message(msg)
     else:
         print(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"))
         print('Content : ', text)
