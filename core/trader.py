@@ -661,7 +661,6 @@ class Bot():
 
         text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
-            text += "현재 거래 방법 : [{}]\n".format(self.trader.get_info(symbol, key='trade_mode'))
             text += '[{}] - [Lev : x{:.1f} | 포지션 : {}]\n'.format(
                 symbol.split('/')[0].upper(),
                 self.trader.get_info(symbol, key='leverage'),
@@ -718,8 +717,6 @@ class Bot():
         
         text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
-
-            text += "현재 거래 방법 : [{}]\n".format(self.trader.get_info(symbol, key='trade_mode'))
             text += '[{}] - [Lev : x{:.1f} | 포지션 : {}]\n'.format(
                 symbol.split('/')[0].upper(),
                 self.trader.get_info(symbol, key='leverage'),
@@ -749,7 +746,6 @@ class Bot():
         text += "[Set 명령어 모음]\n"
         text += "1) set [coin 이름] [leverage] : 해당 코인이름의 레버리지 정보 변화.\n"
         text += "2) set [coin 이름] [max buy cnt] : 해당 코인이름의 최대 매수 갯수 정보 변화.\n"
-        text += "3) set mode ['all', 'cond', 'rand'] : all - 매수/매도 시그널에 따라 진행 | cond - 매수/매도의 state까지 고려하여 진행 | rand - 'all'과 'cond'를 코인마다 랜덤으로 지정.\n\n"
         text += "4) set [coin 이름] mv [숫자] : 최소 거래 단위 설정 (예 - BTC 기준 0.001 x 수량).\n"
         text += "5) set short [숫자] : 0이면 short 진입 X, 0외의 숫자면 short 진입.\n\n"
 
