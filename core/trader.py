@@ -29,8 +29,8 @@ class Bot():
         - Telegram을 통한 주문 기록 및 현재 상태 조회
     """
     def __init__(self):
-        self.setup()
         self.telegram_chk = False
+        self.setup()
 
     def setup(self):
         self.trader = UserData()
