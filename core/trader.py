@@ -704,7 +704,7 @@ class Bot():
                 unpnl, (unpnl/total_sum) * 100,
             )
 
-        roe, pnl = await self.check_positions())
+        roe, pnl = await self.check_positions()
         
         text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
