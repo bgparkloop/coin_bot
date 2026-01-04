@@ -277,7 +277,7 @@ class Bot():
 
                     buy_qty = self.trader.get_info(target_coin, key='min_vol') * trade_vol
 
-                    order = self.market_order(
+                    order = await self.market_order(
                         target_coin,
                         position=check_pos,
                         vol=buy_qty,
@@ -333,7 +333,7 @@ class Bot():
 
                     buy_qty = self.trader.get_info(target_coin, key='min_vol') * trade_vol
 
-                    order = self.market_order(
+                    order = await self.market_order(
                         target_coin,
                         position=check_pos,
                         vol=buy_qty,
@@ -356,7 +356,7 @@ class Bot():
                     sell_cnt = self.trader.remove_pos_list(target_coin)
                     sell_qty = self.trader.get_info(target_coin, key='min_vol') * sell_cnt
 
-                    order = self.market_order(
+                    order = await self.market_order(
                         target_symbol,
                         position=cur_pos,
                         vol=sell_qty,
@@ -438,7 +438,7 @@ class Bot():
             # -----------------------------
             # 체결 정보 조회
             # -----------------------------
-            _order = self.fetch_order(target_symbol, order['id'])
+            _order = await self.fetch_order(target_symbol, order['id'])
             self.sleep(1)
 
             target_coin = self.symbol_parser(target_symbol)
