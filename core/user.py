@@ -127,7 +127,7 @@ class UserData():
                     break
 
                 used = 0
-                for _ in range(qty):
+                for _ in range(int(qty)):
                     if cum_cnt == base_cnt:
                         matched = True
                         break
