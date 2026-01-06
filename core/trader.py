@@ -248,7 +248,7 @@ class Bot():
                 # -----------------------------
                 # 기본 정보
                 # -----------------------------
-                cur_pos   = self.trader.get_info(target_symbol, key='position')
+                cur_pos   = self.trader.get_info(target_coin, key='position')
                 new_buy_roe = self.trader.get_info(target_coin, key='new_buy_roe')
                 use_short = self.trader.get_info(target_coin, key='use_short')
 
