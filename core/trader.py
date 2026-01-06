@@ -277,6 +277,7 @@ class Bot():
 
                     buy_qty = self.trader.get_info(target_coin, key='min_vol') * trade_vol
 
+                    print('HHHERE1')
                     order = await self.market_order(
                         target_coin,
                         position=check_pos,
@@ -291,7 +292,7 @@ class Bot():
                 # =============================
                 # 2️⃣ 추가 매수 (물타기)
                 # =============================
-                if (
+                elif (
                     cur_pos == check_pos and
                     cur_time != buy_time and
                     _roe < -new_buy_roe and
@@ -333,6 +334,7 @@ class Bot():
 
                     buy_qty = self.trader.get_info(target_coin, key='min_vol') * trade_vol
 
+                    print('HHHERE2')
                     order = await self.market_order(
                         target_coin,
                         position=check_pos,
@@ -347,7 +349,7 @@ class Bot():
                 # =============================
                 # 3️⃣ 반대 포지션 → 전량 청산
                 # =============================
-                if (
+                elif (
                     cur_pos != check_pos and
                     cur_time != sell_time and
                     self.trader.get_info(target_coin, key='buy_cnt') > 0
@@ -363,13 +365,15 @@ class Bot():
                         trade_type='sell'
                     )
 
+                    print('HHHERE3')
                     order_list.append([target_symbol, order, f'sell_{cur_pos}', trade_vol, cur_time])
                     continue
 
-                # =============================
-                # 4️⃣ 아무것도 안 함
-                # =============================
-                append_none()
+                else:
+                    # =============================
+                    # 4️⃣ 아무것도 안 함
+                    # =============================
+                    append_none()
 
             
         except ccxt.InvalidOrder as e:
