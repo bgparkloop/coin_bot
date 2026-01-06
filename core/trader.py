@@ -395,6 +395,12 @@ class Bot():
             print('New API generated')
             
 
+        print('Order List')
+        for ii, _order in enumerate(order_list):
+            print(ii+1, _order)
+            print()
+        print()
+
         try:
             msg_list = await self.post_trade(order_list)
 
