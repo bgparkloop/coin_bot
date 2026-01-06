@@ -28,6 +28,7 @@ class UserData():
         self.cum_pnl = 0
         self.win_cnt = 0
         self.tot_cnt = 0
+        self.commition = 0.05
 
         for target in self.config['OKX']['TARGET']:
             if target not in self.data:
@@ -270,6 +271,7 @@ class UserData():
         data['cum_pnl'] = self.cum_pnl
         data['win_cnt'] = self.win_cnt
         data['tot_cnt'] = self.tot_cnt
+        data['commition'] = self.commition
 
         for t_coin in self.get_target_symbols():
             data[t_coin] = {}
