@@ -226,7 +226,6 @@ class Bot():
             
         try:
             roe, pnl = await self.check_positions()
-            cur_pos = []
             order_list = []
             if 'USDT.P' in symbol:
                 target_coin = symbol.split('USDT.P')[0] + '/USDT:USDT'
@@ -262,11 +261,12 @@ class Bot():
                 def append_none():
                     order_list.append([target_coin, None, None, trade_vol, cur_time])
 
+                print(ti, target_symbol, cur_pos, _roe, _pnl, check_pos)
+
                 # =============================
                 # 1️⃣ 신규 진입
                 # =============================
                 if cur_pos is None:
-
                     if check_pos is None or cur_time == buy_time:
                         append_none()
                         continue
