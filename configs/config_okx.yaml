@@ -36,7 +36,7 @@ TRADE_OPTION:
     precision: 2
     map_vol: 10
     round_num: 3
-    new_buy_roe: 5
+    new_buy_roe: 2.5
     use_short: False
 
 SAVE_PATH: './info_okx.json'

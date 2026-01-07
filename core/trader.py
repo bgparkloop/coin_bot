@@ -261,7 +261,7 @@ class Bot():
                 def append_none():
                     order_list.append([target_coin, None, None, trade_vol, cur_time])
 
-                print(ti, target_symbol, cur_pos, _roe, _pnl, check_pos)
+                print('ti: ', ti, target_symbol, cur_pos, _roe, _pnl, check_pos)
 
                 # =============================
                 # 1️⃣ 신규 진입
@@ -497,7 +497,7 @@ class Bot():
                 filled_price = float(_order['price'])
 
                 total_profit = self.trader.calc_profit(target_symbol, filled_price, filled_vol)
-                ratio = abs(total_profit) / self.get_balance()
+                ratio = abs(total_profit) / await self.get_balance()
 
                 cum_profit = self.trader.get_info(None, key='cum_profit')
                 cum_pnl = self.trader.get_info(None, key='cum_pnl')

@@ -195,9 +195,9 @@ class UserData():
         elif position == 'short':
             diff = (avg_price - filled_price)
 
-        print('profit : ', diff, filled_vol, self.commition)
-
         profit = ((diff * filled_vol) * (1 - self.commition * 2)) # * self.leverage
+        
+        print('profit : ', profit, diff, filled_vol, self.commition)
 
         return profit
 
@@ -224,14 +224,12 @@ class UserData():
         return min_vol / map_vol
 
     def get_buy_vol_okx(self, target_symbol, position=None):
-        target_coin = self.symbol_parser(target_symbol)
-        
-        lev = self.config['MAP_COIN_VOLUME'][target_coin]
+        map_vol = self.get_info(target_symbol, key='map_vol')
 
         if position == 'short':
-            return round(self.target_info[target_coin]['buy_vol'] * lev/2, 1)
+            return round(self.data[target_symbol]['buy_vol'] * map_vol/2, 1)
         else:
-            return round(self.target_info[target_coin]['buy_vol'] * lev, 1)
+            return round(self.data[target_symbol]['buy_vol'] * map_vol, 1)
 
     def load_info(self):
         if os.path.exists(self.config['SAVE_PATH']):
@@ -242,7 +240,7 @@ class UserData():
                 try:
                     if k in self.get_target_symbols():
                         for k2, v2 in v.items():
-                            self.target_info[k][k2] = v2
+                            self.data[k][k2] = v2
                     else:
                         setattr(self, k, v)
                 except:
