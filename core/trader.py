@@ -788,6 +788,8 @@ class Bot():
                     if tokens[2].lower() == 'lev':
                         lev = float(tokens[3])
                         self.trader.update(target_symbol, key='leverage', value=lev)
+                        asyncio.run(self.set_leverage(target_symbol, lev, 'cross'))
+                        asyncio.run(self.set_leverage(target_symbol, lev, 'isolated'))
                         
                     elif tokens[2].lower() == 'cnt':
                         cnt = float(tokens[3])
