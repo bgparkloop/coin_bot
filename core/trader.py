@@ -692,7 +692,7 @@ class Bot():
 
         return text
 
-    async def status_msg(self):
+    def status_msg(self):
         text = "============================================\n"
        
         if self.go_trade:
@@ -777,7 +777,7 @@ class Bot():
             # await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
             self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
 
-    async def msg_handler(self, update, context):
+    def msg_handler(self, update, context):
         user_text = update.message.text
         tokens = user_text.split()
         print('tokens : ', tokens)
@@ -821,15 +821,21 @@ class Bot():
                 
                 self.update(target_symbol, key='use_short', value=flag)
 
-            msg = await self.update_positions()
-            await self.post_message(msg)
+            # msg = await self.update_positions()
+            msg = asyncio.run(self.update_positions())
+            asyncio.run(self.post_message(msg))
+            # await self.post_message(msg)
 
-            msg = await self.status_msg()
-            await self.post_message(msg)
+            # msg = await self.status_msg()
+            msg = asyncio.run(self.status_msg())
+            asyncio.run(self.post_message(msg))
+            # await self.post_message(msg)
 
         elif tokens[0].lower() == 'show':
-            msg = await self.status_msg()
-            await self.post_message(msg)
+            # msg = await self.status_msg()
+            msg = asyncio.run(self.status_msg())
+            asyncio.run(self.post_message(msg))
+            # await self.post_message(msg)
 
         # elif tokens[0].lower() == 'help':
         #     msg = self.help_msg()
