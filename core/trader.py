@@ -647,37 +647,38 @@ class Bot():
     """
     def start_msg(self):
         text = "============================================\n"
-        text += '현재 시간 : {}\n'.format(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),)
+        text += '현재 시간: {}\n'.format(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),)
         text += "[자동 거래 시작] USER : [{}]\n".format(
             self.trader.get_info(None, 'user_name'),
             )
 
         total_sum, cur_balance, unpnl = self.get_cur_balance()
 
-        text += "현재 계좌\nFree : [{:.2f}/{:.2f} USDT]\n".format(
+        text += "현재 계좌\nFree: [{:.2f}/{:.2f} USDT]\n".format(
             self.trader.get_info(None, 'balance'),
             cur_balance,
         )
 
-        text += '현재 누적 거래 이익 : {:,.2f} USDT [{:,.2f}%]\n'.format(
+        text += '현재 누적 거래 이익: {:,.2f} USDT [{:,.2f}%]\n'.format(
                 self.trader.get_info(None, key='cum_profit'), 
                 self.trader.get_info(None, key='cum_pnl') * 100,
             )
 
-        text += '현재 미실현 손익 : {:,.2f} USDT [{:,.2f}%]\n'.format(
+        text += '현재 미실현 손익: {:,.2f} USDT [{:,.2f}%]\n'.format(
                 unpnl, (unpnl/total_sum) * 100,
             )
 
         text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
-            text += '[{}] - [Lev : x{:.1f} | 포지션 : {}]\n'.format(
+            text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
                 symbol.split('/')[0].upper(),
                 self.trader.get_info(symbol, key='leverage'),
                 self.trader.get_info(symbol, key='position'),
+                self.trader.get_info(symbol, key='use_short'),
             )
-            text += "평균 진입 가격 : {:.{}f}\n".format(self.trader.get_info(symbol, key='avg_buy_price'), 
+            text += "평균 진입 가격: {:.{}f}\n".format(self.trader.get_info(symbol, key='avg_buy_price'), 
                                                     self.trader.get_info(symbol, key='precision'))
-            text += '현재 보유 수량 : [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
+            text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
                 self.trader.get_belong_vol(symbol, False),
                 self.trader.get_info(symbol, key='round_num'),
                 self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
@@ -703,22 +704,22 @@ class Bot():
         total_sum, cur_balance, unpnl = self.get_cur_balance()
 
         # text += "현재 거래 방법 : [{}]\n".format(self.get_trade_mode())
-        text += "[현재 정보] USER : [{}]\n현재 시간 : {}\n".format(
+        text += "[현재 정보] USER: [{}]\n현재 시간 : {}\n".format(
             self.trader.get_info(None, 'user_name'),
             datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),            
         )
 
-        text += "현재 계좌\nFree : [{:.2f}/{:.2f} USDT]\n".format(
+        text += "현재 계좌\nFree: [{:.2f}/{:.2f} USDT]\n".format(
             self.trader.get_info(None, 'balance'),
             cur_balance,
         )
         
-        text += '현재 누적 거래 이익 : {:,.2f} USDT [{:,.2f}%]\n'.format(
+        text += '현재 누적 거래 이익: {:,.2f} USDT [{:,.2f}%]\n'.format(
                 self.trader.get_info(None, key='cum_profit'), 
                 self.trader.get_info(None, key='cum_pnl') * 100,
             )
 
-        text += '현재 미실현 손익 : {:,.2f} USDT [{:,.2f}%]\n'.format(
+        text += '현재 미실현 손익: {:,.2f} USDT [{:,.2f}%]\n'.format(
                 unpnl, (unpnl/total_sum) * 100,
             )
 
@@ -726,13 +727,14 @@ class Bot():
         
         text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
-            text += '[{}] - [Lev : x{:.1f} | 포지션 : {}]\n'.format(
+            text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
                 symbol.split('/')[0].upper(),
                 self.trader.get_info(symbol, key='leverage'),
                 self.trader.get_info(symbol, key='position'),
+                self.trader.get_info(symbol, key='use_short'),
             )
 
-            text += '현재 보유 수량 : [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
+            text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
                 self.trader.get_belong_vol(symbol, False),
                 self.trader.get_info(symbol, key='round_num'),
                 self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
@@ -742,8 +744,8 @@ class Bot():
                 )
 
             avg_price = self.trader.get_info(symbol, key='avg_buy_price')
-            text += "평균 진입 가격 : {:.{}f}\n".format(avg_price, self.trader.get_info(symbol, key='precision'))
-            text += "현재 이익률 : [{:,.2f} USDT | {:,.2f}%]\n\n".format(
+            text += "평균 진입 가격: {:.{}f}\n".format(avg_price, self.trader.get_info(symbol, key='precision'))
+            text += "현재 이익률: [{:,.2f} USDT | {:,.2f}%]\n\n".format(
                 pnl[ti],
                 roe[ti],
             )
