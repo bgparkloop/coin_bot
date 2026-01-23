@@ -692,7 +692,7 @@ class Bot():
 
         return text
 
-    def status_msg(self):
+    async def status_msg(self):
         text = "============================================\n"
        
         if self.go_trade:
