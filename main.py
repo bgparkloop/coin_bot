@@ -37,16 +37,16 @@ async def on_startup():
 # ==============================
 # Telegram Webhook Endpoint
 # ==============================
-@app.post("/telegram")
-async def telegram_webhook(request: Request):
-    data = await request.json()
+# @app.post("/telegram")
+# async def telegram_webhook(request: Request):
+#     data = await request.json()
 
-    print("📨 RAW UPDATE:", data)
+#     print("📨 RAW UPDATE:", data)
 
-    update = Update.de_json(data, bot.msgbot)
-    await bot.app.process_update(update)
+#     update = Update.de_json(data, bot.msgbot)
+#     await bot.app.process_update(update)
 
-    return {"ok": True}
+#     return {"ok": True}
 
 
 # 허용할 IP 주소 목록

@@ -774,7 +774,8 @@ class Bot():
 
     async def post_message(self, msg):
         if msg is not None:
-            await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
+            # await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
+            self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
 
     async def msg_handler(self, update, context):
         user_text = update.message.text
