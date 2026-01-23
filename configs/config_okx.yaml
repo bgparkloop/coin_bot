@@ -4,8 +4,8 @@ OKX:
   SECRET_KEY: '4E4FD9C67CF4CA9F6C398721971BC011'
   PASSWD: 'Fhfhfl12@@'
   # TARGET: ['BTC/USDT:USDT']
-  TARGET: ['ETH/USDT:USDT']
-  # TARGET: ['BTC/USDT:USDT', 'ETH/USDT:USDT']
+  # TARGET: ['ETH/USDT:USDT']
+  TARGET: ['BTC/USDT:USDT', 'ETH/USDT:USDT']
 
 TELEGRAM:
   TOKEN: "6291205200:AAFzsJNwkavn_cbYwgTUu3vMj43BC3S-kNk"
@@ -30,13 +30,13 @@ TRADE_OPTION:
     use_short: False
 
   ETH:
-    leverage: 2
+    leverage: 1.5
     min_vol: 0.1
     vol_mul: 1
     precision: 2
     map_vol: 10
     round_num: 3
-    new_buy_roe: 2.5
+    new_buy_roe: 1.5
     use_short: False
 
 SAVE_PATH: './info_okx.json'
