@@ -24,10 +24,10 @@ async def periodic_task(interval):
 @app.on_event("startup")
 async def on_startup():
     # 메시지 핸들러 등록
-    bot.app.add_handler(MessageHandler(filters.TEXT, bot.msg_handler))
+    # bot.app.add_handler(MessageHandler(filters.TEXT, bot.msg_handler))
 
-    await bot.app.initialize()
-    await bot.app.start()
+    # await bot.app.initialize()
+    # await bot.app.start()
     msg = bot.start_msg()
     await bot.post_message(msg)
     # 5초마다 실행
