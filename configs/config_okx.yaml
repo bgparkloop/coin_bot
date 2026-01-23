@@ -30,9 +30,9 @@ TRADE_OPTION:
     use_short: False
 
   ETH:
-    leverage: 2.5
+    leverage: 2
     min_vol: 0.1
-    vol_mul: 2
+    vol_mul: 1
     precision: 2
     map_vol: 10
     round_num: 3

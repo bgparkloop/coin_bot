@@ -50,26 +50,28 @@ class Bot():
         self.req_data_cnt = 300
 
         if not self.telegram_chk:
-            self.app = (
-                ApplicationBuilder()
-                .token(self.trader.get_telegram_token())
-                .post_init(self.on_startup)   # ✔️ 여기!
-                .read_timeout(10)
-                .write_timeout(10)
-                .build()
-            )
+            # 20.0 ver >= 코드
+            # self.app = (
+            #     ApplicationBuilder()
+            #     .token(self.trader.get_telegram_token())
+            #     .post_init(self.on_startup)   # ✔️ 여기!
+            #     .read_timeout(10)
+            #     .write_timeout(10)
+            #     .build()
+            # )
 
-            # bot 객체 얻기
-            self.msgbot = self.app.bot
+            # # bot 객체 얻기
+            # self.msgbot = self.app.bot
 
             # 메시지 핸들러 등록
             # self.app.add_handler(MessageHandler(filters.TEXT, self.msg_handler))
 
-            # self.msgbot = telegram.Bot(token=self.trader.get_telegram_token())
-            # self.updater = Updater(self.trader.get_telegram_token(), use_context=True)
+            # python-telegram-bot==13.15 ver
+            self.msgbot = telegram.Bot(token=self.trader.get_telegram_token())
+            self.updater = Updater(self.trader.get_telegram_token(), use_context=True)
 
-            # self.updater.dispatcher.add_handler(MessageHandler(Filters.text, self.msg_handler))
-            # self.updater.start_polling(timeout=10)
+            self.updater.dispatcher.add_handler(MessageHandler(Filters.text, self.msg_handler))
+            self.updater.start_polling(timeout=10)
             
             self.telegram_chk = True
         
@@ -607,10 +609,16 @@ class Bot():
                 self.trader.update(target_symbol, key='position_list', value=[])
                 
 
-        if check or old_balance != await self.get_balance() and check:
-            print(check, old_balance, await self.get_balance())
-            print()
-            msg = await self.status_msg()
+        if check or old_balance != await self.get_balance():
+            if check:
+                print(check, old_balance, await self.get_balance())
+                print()
+                msg = await self.status_msg()
+
+            else:
+                print(check, old_balance, await self.get_balance())
+                print()
+                msg = await self.status_msg()
 
             self.set_balance()
             return msg
@@ -761,22 +769,13 @@ class Bot():
 
         return text
 
-    async def on_startup(self, app):
-        print("스타트업 콜백 실행됨!")
-        await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text="봇 시작됨!")
-
-    # async def msg_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-    #     text = update.message.text
-    #     print("받은 메시지:", text)
-    #     await update.message.reply_text(f"메시지 받음: {text}")
+    # async def on_startup(self, app):
+    #     print("스타트업 콜백 실행됨!")
+    #     await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text="봇 시작됨!")
 
     async def post_message(self, msg):
         if msg is not None:
             await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
-
-    # def start(self):
-    #     print("🔥 polling 시작")
-    #     self.app.run_polling()
 
     async def msg_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_text = update.message.text
