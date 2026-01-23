@@ -776,7 +776,7 @@ class Bot():
         if msg is not None:
             await self.msgbot.send_message(chat_id=self.trader.get_telegram_id(), text=msg)
 
-    async def msg_handler(self, update: update, context: ContextTypes.DEFAULT_TYPE):
+    async def msg_handler(self, update, context):
         user_text = update.message.text
         tokens = user_text.split()
         print('tokens : ', tokens)
