@@ -800,54 +800,55 @@ class Bot():
         print('tokens : ', tokens)
 
         if tokens[0].lower() == 'set':
-            for ti, target_symbol in enumerate(self.trader.get_target_symbols()):
-                if tokens[1].lower() in target_symbol.lower():
-                    if tokens[2].lower() == 'lev':
-                        lev = float(tokens[3])
-                        self.trader.update(target_symbol, key='leverage', value=lev)
-                        asyncio.run(self.set_leverage(target_symbol, lev, 'cross'))
-                        asyncio.run(self.set_leverage(target_symbol, lev, 'isolated'))
-                        
-                    elif tokens[2].lower() == 'cnt':
-                        cnt = float(tokens[3])
-                        self.trader.update(target_symbol, key='max_buy_cnt', value=cnt)
-
-                    elif tokens[2].lower() == 'mv':
-                        cnt = float(tokens[3])
-                        min_vol = cnt * 0.1
-                        self.trader.update(target_symbol, key='min_vol', value=min_vol)
-
-                    elif tokens[2].lower() == 'add':
-                        ratio = float(tokens[3])
-                        self.trader.update(target_symbol, key='new_buy_roe', value=ratio)
-
-                    elif tokens[2].lower() == 'trade':
-                        tgt = float(tokens[2])
-                        if tgt != 0:
-                            flag = True
-                        else:
-                            flag = False
-
-                        self.trader.update(target_symbol, key='go_trade', value=flag)
-            
-            if tokens[1].lower() == 'trade':
-                tgt = float(tokens[2])
-                if tgt != 0:
-                    flag = True
-                else:
-                    flag = False
-
+            if len(tokens) > 3:
                 for ti, target_symbol in enumerate(self.trader.get_target_symbols()):
-                    self.trader.update(target_symbol, key='go_trade', value=flag)
+                    if tokens[1].lower() in target_symbol.lower():
+                        if tokens[2].lower() == 'lev':
+                            lev = float(tokens[3])
+                            self.trader.update(target_symbol, key='leverage', value=lev)
+                            asyncio.run(self.set_leverage(target_symbol, lev, 'cross'))
+                            asyncio.run(self.set_leverage(target_symbol, lev, 'isolated'))
+                            
+                        elif tokens[2].lower() == 'cnt':
+                            cnt = float(tokens[3])
+                            self.trader.update(target_symbol, key='max_buy_cnt', value=cnt)
 
-            elif tokens[1].lower() == 'short':
-                tgt = float(tokens[2])
-                if tgt != 0:
-                    flag = True
-                else:
-                    flag = False
-                
-                self.update(target_symbol, key='use_short', value=flag)
+                        elif tokens[2].lower() == 'mv':
+                            cnt = float(tokens[3])
+                            min_vol = cnt * 0.1
+                            self.trader.update(target_symbol, key='min_vol', value=min_vol)
+
+                        elif tokens[2].lower() == 'add':
+                            ratio = float(tokens[3])
+                            self.trader.update(target_symbol, key='new_buy_roe', value=ratio)
+
+                        elif tokens[2].lower() == 'trade':
+                            tgt = float(tokens[2])
+                            if tgt != 0:
+                                flag = True
+                            else:
+                                flag = False
+
+                            self.trader.update(target_symbol, key='go_trade', value=flag)
+            elif len(tokens) == 3:
+                if tokens[1].lower() == 'trade':
+                    tgt = float(tokens[2])
+                    if tgt != 0:
+                        flag = True
+                    else:
+                        flag = False
+
+                    for ti, target_symbol in enumerate(self.trader.get_target_symbols()):
+                        self.trader.update(target_symbol, key='go_trade', value=flag)
+
+                elif tokens[1].lower() == 'short':
+                    tgt = float(tokens[2])
+                    if tgt != 0:
+                        flag = True
+                    else:
+                        flag = False
+                    
+                    self.update(target_symbol, key='use_short', value=flag)
 
             # msg = await self.update_positions()
             msg = asyncio.run(self.update_positions())
