@@ -823,7 +823,7 @@ class Bot():
                             self.trader.update(target_symbol, key='new_buy_roe', value=ratio)
 
                         elif tokens[2].lower() == 'trade':
-                            tgt = float(tokens[2])
+                            tgt = float(tokens[3])
                             if tgt != 0:
                                 flag = True
                             else:
