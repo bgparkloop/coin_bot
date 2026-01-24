@@ -223,8 +223,8 @@ class Bot():
         time.sleep(sleep_time)
 
     async def trade(self, symbol, check_pos, trade_vol, cur_close):
-        if not self.go_trade:
-            return
+        # if not self.go_trade:
+        #     return
             
         try:
             roe, pnl = await self.check_positions()
@@ -245,6 +245,9 @@ class Bot():
             """
             for ti, target_symbol in enumerate(self.trader.get_target_symbols()):
                 if target_coin not in target_symbol:
+                    continue
+
+                if not self.trader.get_info(target_coin, key='go_trade'):
                     continue
 
                 # -----------------------------
@@ -833,9 +836,9 @@ class Bot():
                     flag = True
                 else:
                     flag = False
-                
-                # self.update(target_symbol, key='use_short', value=flag)
-                self.go_trade = flag
+
+                for ti, target_symbol in enumerate(self.trader.get_target_symbols()):
+                    self.trader.update(target_symbol, key='go_trade', value=flag)
 
             elif tokens[1].lower() == 'short':
                 tgt = float(tokens[2])
