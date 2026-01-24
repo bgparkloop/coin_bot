@@ -28,6 +28,7 @@ TRADE_OPTION:
     round_num: 4
     new_buy_roe: 5
     use_short: False
+    go_trade: True
 
   ETH:
     leverage: 1.5
@@ -38,6 +39,7 @@ TRADE_OPTION:
     round_num: 3
     new_buy_roe: 1.5
     use_short: False
+    go_trade: True
 
 SAVE_PATH: './info_okx.json'
 

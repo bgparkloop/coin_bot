@@ -668,26 +668,32 @@ class Bot():
                 unpnl, (unpnl/total_sum) * 100,
             )
 
-        text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
+        n_act = 0
+        for symbol in self.trader.get_target_symbols():
+            if self.trader.get_info(symbol, key='go_trade'):
+                n_act += 1
+
+        text += '활성화 코인 리스트 - [{}/{} 개]\n\n'.format(n_act, len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
-            text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
-                symbol.split('/')[0].upper(),
-                self.trader.get_info(symbol, key='leverage'),
-                self.trader.get_info(symbol, key='position'),
-                self.trader.get_info(symbol, key='use_short'),
-            )
-            text += "평균 진입 가격: {:.{}f}\n".format(self.trader.get_info(symbol, key='avg_buy_price'), 
-                                                    self.trader.get_info(symbol, key='precision'))
-            text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
-                self.trader.get_belong_vol(symbol, False),
-                self.trader.get_info(symbol, key='round_num'),
-                self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
-                self.trader.get_info(symbol, key='round_num'),
-                self.trader.get_info(symbol, key='buy_cnt'),
-                self.trader.get_info(symbol, key='max_buy_cnt'),
+            if self.trader.get_info(symbol, key='go_trade'):
+                text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
+                    symbol.split('/')[0].upper(),
+                    self.trader.get_info(symbol, key='leverage'),
+                    self.trader.get_info(symbol, key='position'),
+                    self.trader.get_info(symbol, key='use_short'),
                 )
-            if ti+1 < len(self.trader.get_target_symbols()):
-                text += '\n'
+                text += "평균 진입 가격: {:.{}f}\n".format(self.trader.get_info(symbol, key='avg_buy_price'), 
+                                                        self.trader.get_info(symbol, key='precision'))
+                text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
+                    self.trader.get_belong_vol(symbol, False),
+                    self.trader.get_info(symbol, key='round_num'),
+                    self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
+                    self.trader.get_info(symbol, key='round_num'),
+                    self.trader.get_info(symbol, key='buy_cnt'),
+                    self.trader.get_info(symbol, key='max_buy_cnt'),
+                    )
+                if ti+1 < len(self.trader.get_target_symbols()):
+                    text += '\n'
 
         text += "============================================"
 
@@ -725,30 +731,36 @@ class Bot():
 
         roe, pnl = await self.check_positions()
         
-        text += '활성화 코인 리스트 - [{} 개]\n\n'.format(len(self.trader.get_target_symbols()))
-        for ti, symbol in enumerate(self.trader.get_target_symbols()):
-            text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
-                symbol.split('/')[0].upper(),
-                self.trader.get_info(symbol, key='leverage'),
-                self.trader.get_info(symbol, key='position'),
-                self.trader.get_info(symbol, key='use_short'),
-            )
+        n_act = 0
+        for symbol in self.trader.get_target_symbols():
+            if self.trader.get_info(symbol, key='go_trade'):
+                n_act += 1
 
-            text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
-                self.trader.get_belong_vol(symbol, False),
-                self.trader.get_info(symbol, key='round_num'),
-                self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
-                self.trader.get_info(symbol, key='round_num'),
-                self.trader.get_info(symbol, key='buy_cnt'),
-                self.trader.get_info(symbol, key='max_buy_cnt'),
+        text += '활성화 코인 리스트 - [{}/{} 개]\n\n'.format(n_act, len(self.trader.get_target_symbols()))
+        for ti, symbol in enumerate(self.trader.get_target_symbols()):
+            if self.trader.get_info(symbol, key='go_trade'):
+                text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
+                    symbol.split('/')[0].upper(),
+                    self.trader.get_info(symbol, key='leverage'),
+                    self.trader.get_info(symbol, key='position'),
+                    self.trader.get_info(symbol, key='use_short'),
                 )
 
-            avg_price = self.trader.get_info(symbol, key='avg_buy_price')
-            text += "평균 진입 가격: {:.{}f}\n".format(avg_price, self.trader.get_info(symbol, key='precision'))
-            text += "현재 이익률: [{:,.2f} USDT | {:,.2f}%]\n\n".format(
-                pnl[ti],
-                roe[ti],
-            )
+                text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
+                    self.trader.get_belong_vol(symbol, False),
+                    self.trader.get_info(symbol, key='round_num'),
+                    self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
+                    self.trader.get_info(symbol, key='round_num'),
+                    self.trader.get_info(symbol, key='buy_cnt'),
+                    self.trader.get_info(symbol, key='max_buy_cnt'),
+                    )
+
+                avg_price = self.trader.get_info(symbol, key='avg_buy_price')
+                text += "평균 진입 가격: {:.{}f}\n".format(avg_price, self.trader.get_info(symbol, key='precision'))
+                text += "현재 이익률: [{:,.2f} USDT | {:,.2f}%]\n\n".format(
+                    pnl[ti],
+                    roe[ti],
+                )
 
         return text
 
@@ -805,6 +817,15 @@ class Bot():
                     elif tokens[2].lower() == 'add':
                         ratio = float(tokens[3])
                         self.trader.update(target_symbol, key='new_buy_roe', value=ratio)
+
+                    elif tokens[2].lower() == 'trade':
+                        tgt = float(tokens[2])
+                        if tgt != 0:
+                            flag = True
+                        else:
+                            flag = False
+
+                        self.trader.update(target_symbol, key='go_trade', value=flag)
             
             if tokens[1].lower() == 'trade':
                 tgt = float(tokens[2])
