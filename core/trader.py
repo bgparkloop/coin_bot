@@ -25,7 +25,7 @@ class Bot():
     """
     def __init__(self):
         self.telegram_chk = False
-        self.msg_bot = None
+        self.msgbot = None
         self.setup()
 
     def setup_api(self):
@@ -48,7 +48,7 @@ class Bot():
         self.req_data_cnt = 300
 
     def set_msgbot(self, msg_bot):
-        self.msg_bot = msg_bot
+        self.msgbot = msg_bot
 
 
     # ========== OKX API ===================
