@@ -1,120 +1,139 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
-import httpx
-import threading
 import asyncio
-from pytz import timezone
 from datetime import datetime
-import traceback
+from pytz import timezone
+
+from telegram.ext import (
+    ApplicationBuilder,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
+
 from telegram import Update
-from telegram.ext import (MessageHandler, filters)
+
 from core.trader import Bot
 
-
+# ======================================================
+# FastAPI
+# ======================================================
 app = FastAPI()
+
+# ======================================================
+# Telegram Bot
+# ======================================================
 bot = Bot()
-bot.setup()
 
-async def periodic_task(interval):
+tg_app = (
+    ApplicationBuilder()
+    .token(bot.trader.get_telegram_token())
+    .build()
+)
+
+bot.set_msgbot(tg_app.bot)
+
+# ---------- Telegram message handler ----------
+async def telegram_msg_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
+    await bot.msg_handler(update, context)
+
+tg_app.add_handler(
+    MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_msg_handler)
+)
+
+# ======================================================
+# Background task
+# ======================================================
+async def periodic_task(interval: int):
     while True:
-        msg = await bot.update_positions()
-        await bot.post_message(msg)
-        await asyncio.sleep(interval)  # interval 초 동안 대기
+        try:
+            msg = await bot.update_positions()
+            await bot.post_message(msg)
+        except Exception as e:
+            print("Periodic task error:", e)
+        await asyncio.sleep(interval)
 
-# 주기적으로 비동기 함수 실행
+# ======================================================
+# FastAPI lifecycle
+# ======================================================
 @app.on_event("startup")
 async def on_startup():
-    # 메시지 핸들러 등록
-    # bot.app.add_handler(MessageHandler(filters.TEXT, bot.msg_handler))
+    # Telegram initialize
+    await tg_app.initialize()
+    await tg_app.start()
 
-    # await bot.app.initialize()
-    # await bot.app.start()
-    msg = bot.start_msg()
-    await bot.post_message(msg)
-    # 5초마다 실행
+    # 시작 메시지
+    start_msg = bot.start_msg()
+    await bot.post_message(start_msg)
+
+    # 주기 작업 시작
     asyncio.create_task(periodic_task(15))
-    # asyncio.create_task(independent_task())
-
-# ==============================
-# Telegram Webhook Endpoint
-# ==============================
-# @app.post("/telegram")
-# async def telegram_webhook(request: Request):
-#     data = await request.json()
-
-#     print("📨 RAW UPDATE:", data)
-
-#     update = Update.de_json(data, bot.msgbot)
-#     await bot.app.process_update(update)
-
-#     return {"ok": True}
 
 
-# 허용할 IP 주소 목록
-ALLOWED_IPS = {"52.89.214.238", "34.212.75.30", "54.218.53.128", "52.32.178.7"}
+@app.on_event("shutdown")
+async def on_shutdown():
+    await tg_app.stop()
+    await tg_app.shutdown()
+
+# ======================================================
+# TradingView Webhook
+# ======================================================
+ALLOWED_IPS = {
+    "52.89.214.238",
+    "34.212.75.30",
+    "54.218.53.128",
+    "52.32.178.7",
+}
 
 def check_ip(request: Request):
     client_ip = request.client.host
     if client_ip not in ALLOWED_IPS:
-        raise HTTPException(status_code=403, detail="Access forbidden: IP not allowed")
+        raise HTTPException(status_code=403, detail="Access forbidden")
 
 @app.post("/webhook", dependencies=[Depends(check_ip)])
 async def receive_webhook(request: Request):
-    """
-        payload format
-        {"symbol": "{{ticker}}", "position": "{{check_pos}}", "cur_close": {{close}}}
-    """
-    body = await request.body()  # Request 본문을 byte로 읽음
-    text = body.decode('utf-8') 
+    body = await request.body()
+    text = body.decode("utf-8")
 
-    """
-        text 예시
-        Price_Action (close, 26, 10, 1, 2, 7, 3): 
-        order sell @ 1 filled on BTCUSDT.P. New strategy position is -39
-    """
-    print('Content : ', text)
-    tokens = text.split(',')
-    print('Tokens : ', tokens)
+    print("Webhook:", text)
 
-    if tokens[0] == 'buy':
-        position = 'long'
-    elif tokens[0] == 'sell':
-        position = 'short'
+    tokens = text.split(",")
+
+    if tokens[0] == "buy":
+        position = "long"
+    elif tokens[0] == "sell":
+        position = "short"
     else:
         position = None
 
     target_symbol = tokens[1]
 
-    if len(tokens) > 2:
+    if len(tokens) > 3:
         position_size = float(tokens[2])
         cur_close = float(tokens[3])
     else:
         position_size = 1
         cur_close = 0
 
-    print('Before Processed ', target_symbol, position, position_size, cur_close)
+    print(
+        datetime.now(timezone("Asia/Seoul")).strftime("%Y-%m-%d %H:%M:%S"),
+        target_symbol,
+        position,
+        position_size,
+        cur_close,
+    )
 
-    # 받은 웹훅 데이터를 처리
     if position is None:
         msg = await bot.update_positions()
         await bot.post_message(msg)
     else:
-        print(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"))
-        print('Content : ', text)
-        print(target_symbol, position_size, cur_close)
+        await bot.trade(
+            symbol=target_symbol,
+            check_pos=position,
+            trade_vol=position_size,
+            cur_close=cur_close,
+        )
 
-        async with asyncio.Lock():
-            await bot.trade(
-                symbol=target_symbol,
-                check_pos=position,
-                trade_vol=position_size,
-                cur_close=cur_close,
-            )
-
-    return {"status": "Webhook received"}
-
-if __name__ == "__main__":
-    """
-        https://www.uvicorn.org/
-    """
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=80, log_level="error")
+    return {"status": "ok"}
