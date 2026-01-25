@@ -48,6 +48,8 @@ class Bot():
         self.req_data_cnt = 300
 
     def set_msgbot(self, msg_bot):
+        # pip install "python-telegram-bot==20.3"
+
         self.msgbot = msg_bot
 
 
@@ -576,9 +578,10 @@ class Bot():
                 
 
         if check or old_balance != await self.get_balance():
-            print(check, old_balance, await self.get_balance())
-            print()
-            msg = await self.status_msg()
+            if check:
+                print(check, old_balance, await self.get_balance())
+                print()
+                msg = await self.status_msg()
 
             self.set_balance()
             return msg
