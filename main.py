@@ -11,8 +11,8 @@ from telegram.ext import (
 )
 
 from telegram import Update
-
 from core.trader import Bot
+
 
 # ======================================================
 # FastAPI
@@ -27,6 +27,7 @@ bot = Bot()
 tg_app = (
     ApplicationBuilder()
     .token(bot.trader.get_telegram_token())
+    .job_queue(None)
     .build()
 )
 
