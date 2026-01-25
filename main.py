@@ -65,7 +65,7 @@ async def on_startup():
     await tg_app.start()
 
     # 시작 메시지
-    start_msg = bot.start_msg()
+    start_msg = await bot.start_msg()
     await bot.post_message(start_msg)
 
     # 주기 작업 시작
