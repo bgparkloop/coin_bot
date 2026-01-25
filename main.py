@@ -65,6 +65,11 @@ async def on_startup():
     await tg_app.initialize()
     await tg_app.start()
 
+    # 🔥 polling 시작
+    await tg_app.bot.initialize()
+    tg_app._running = True
+    asyncio.create_task(tg_app._polling())
+
     # 시작 메시지
     start_msg = await bot.start_msg()
     await bot.post_message(start_msg)
