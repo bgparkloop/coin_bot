@@ -77,16 +77,23 @@ class UserData():
     def remove_pos_list(self, target_symbol):
         return self.data[target_symbol]['position_list'].pop()
 
-    def recal_pos_list(self, target_symbol, amt):
+    def recal_pos_list(self, target_symbol, belong_vol):
         # -----------------------------
         # 기본 정보 로드
         # -----------------------------
         position_list = []
         prev_positions = self.get_info(target_symbol, key='position_list')
         max_cnt = self.get_info(target_symbol, key='max_buy_cnt')
+        buy_vol = self.get_buy_vol(target_symbol)
         min_vol = self.get_info(target_symbol, key='min_vol')
 
-        real_cnt = round(amt / min_vol)
+        if buy_vol <= 0:
+            self.update(target_symbol, key='position_list', value=[])
+            return 0
+
+        # Rebuild buy count from the actual held size instead of relying on
+        # internally tracked order history.
+        real_cnt = int(round(belong_vol / buy_vol))
 
         # -----------------------------
         # last_qty 계산
@@ -174,8 +181,8 @@ class UserData():
         # -----------------------------
         # 반환 cnt 보정
         # -----------------------------
-        if cum_cnt > 0 and cum_cnt * min_vol < amt:
-            return amt // cum_cnt
+        if cum_cnt > 0 and cum_cnt * buy_vol < belong_vol:
+            return max(real_cnt, int(cum_cnt))
 
         return int(cum_cnt)
 

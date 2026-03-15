@@ -559,8 +559,8 @@ class Bot():
                         self.trader.update(target_symbol, key='amt', value=belong_vol)
                         check=True
 
-                    if amt > 0:
-                        cnt = self.trader.recal_pos_list(target_symbol, amt)
+                    if belong_vol > 0:
+                        cnt = self.trader.recal_pos_list(target_symbol, belong_vol)
                         self.trader.update(target_symbol, key='buy_cnt', value=cnt)
 
                     chk = False
