@@ -94,6 +94,8 @@ class UserData():
         # Rebuild buy count from the actual held size instead of relying on
         # internally tracked order history.
         real_cnt = int(round(belong_vol / buy_vol))
+        if belong_vol > 0 and real_cnt == 0:
+            real_cnt = 1
 
         # -----------------------------
         # last_qty 계산

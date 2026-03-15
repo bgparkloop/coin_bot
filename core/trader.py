@@ -236,6 +236,7 @@ class Bot():
 
                 _roe, _pnl = roe[ti], pnl[ti]
                 cur_time = time.time()
+                cur_amt = self.trader.get_belong_vol(target_coin, False)
 
                 buy_time  = self.trader.get_info(target_coin, key='buy_time')
                 sell_time = self.trader.get_info(target_coin, key='sell_time')
@@ -334,7 +335,7 @@ class Bot():
                 elif (
                     cur_pos != check_pos and
                     cur_time != sell_time and
-                    self.trader.get_info(target_coin, key='buy_cnt') > 0
+                    cur_amt > 0
                 ):
 
                     sell_cnt = self.trader.remove_pos_list(target_coin)

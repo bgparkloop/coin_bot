@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException, Depends
 import asyncio
+import logging
 from datetime import datetime
 from pytz import timezone
 
@@ -14,10 +15,43 @@ from telegram import Update
 from core.trader import Bot
 
 
+class UvicornAccessFilter(logging.Filter):
+    def filter(self, record):
+        args = getattr(record, "args", ())
+        if len(args) < 5:
+            return True
+
+        method = str(args[1])
+        path = str(args[2])
+        status_code = int(args[4])
+
+        if path == "/webhook":
+            return True
+
+        if method in {"GET", "POST"} and status_code in {403, 404}:
+            return False
+
+        return True
+
+
+class UvicornErrorFilter(logging.Filter):
+    def filter(self, record):
+        return "Invalid HTTP request received" not in record.getMessage()
+
+
+def configure_logging():
+    access_logger = logging.getLogger("uvicorn.access")
+    error_logger = logging.getLogger("uvicorn.error")
+
+    access_logger.addFilter(UvicornAccessFilter())
+    error_logger.addFilter(UvicornErrorFilter())
+
+
 # ======================================================
 # FastAPI
 # ======================================================
 app = FastAPI()
+configure_logging()
 
 # ======================================================
 # Telegram Bot
