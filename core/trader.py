@@ -140,6 +140,118 @@ class Bot():
     def side_label(self, side):
         return '롱' if side == 'long' else '숏'
 
+    def side_badge(self, side):
+        return '🟢 롱' if side == 'long' else '🔴 숏'
+
+    def position_badge(self, position):
+        if position == 'long':
+            return '🟢 롱'
+        if position == 'short':
+            return '🔴 숏'
+        if position == 'hedge':
+            return '🟢/🔴 헤지'
+        return '⚪ 없음'
+
+    def pnl_badge(self, pnl_value):
+        if pnl_value > 0:
+            return '🟢'
+        if pnl_value < 0:
+            return '🔴'
+        return '⚪'
+
+    def render_oneway_card(self, symbol, pnl_value=None, roe_value=None):
+        round_num = self.trader.get_info(symbol, key='round_num')
+        precision = self.trader.get_info(symbol, key='precision')
+        max_size = self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt')
+
+        lines = [
+            '┌ {} ─ Lev x{:.1f} ─────────────'.format(
+                symbol.split('/')[0].upper(),
+                self.trader.get_info(symbol, key='leverage'),
+            ),
+            '│ 포지션  {}'.format(self.position_badge(self.trader.get_info(symbol, key='position'))),
+            '│ 수량    {:,.{}f} / {:,.{}f}'.format(
+                self.trader.get_belong_vol(symbol, False),
+                round_num,
+                max_size,
+                round_num,
+            ),
+            '│ 단계    {} / {}'.format(
+                self.trader.get_info(symbol, key='buy_cnt'),
+                self.trader.get_info(symbol, key='max_buy_cnt'),
+            ),
+            '│ 진입    {:.{}f}'.format(
+                self.trader.get_info(symbol, key='avg_buy_price'),
+                precision,
+            ),
+        ]
+
+        if pnl_value is not None and roe_value is not None:
+            lines.append(
+                '│ 손익    {} {:+,.2f}U | ROE {:+,.2f}%'.format(
+                    self.pnl_badge(pnl_value),
+                    pnl_value,
+                    roe_value,
+                )
+            )
+
+        lines.append('└─────────────────────────────')
+        return '\n'.join(lines)
+
+    def render_hedge_side_block(self, symbol, side, max_size, metrics):
+        round_num = self.trader.get_info(symbol, key='round_num')
+        precision = self.trader.get_info(symbol, key='precision')
+        pnl_value = float(metrics.get('pnl') or 0)
+        roe_value = float(metrics.get('roe') or 0)
+
+        return '\n'.join([
+            '│ {}'.format(self.side_badge(side)),
+            '│   수량  {:,.{}f} / {:,.{}f}'.format(
+                self.trader.get_side_belong_vol(symbol, side, False),
+                round_num,
+                max_size,
+                round_num,
+            ),
+            '│   단계  {} / {}'.format(
+                self.trader.get_side_info(symbol, side, 'buy_cnt'),
+                self.trader.get_info(symbol, key='max_buy_cnt'),
+            ),
+            '│   진입  {:.{}f}'.format(
+                self.trader.get_side_info(symbol, side, 'avg_buy_price'),
+                precision,
+            ),
+            '│   손익  {} {:+,.2f}U'.format(
+                self.pnl_badge(pnl_value),
+                pnl_value,
+            ),
+            '│   ROE   {:+,.2f}%'.format(roe_value),
+        ])
+
+    def render_hedge_card(self, symbol, metrics):
+        round_num = self.trader.get_info(symbol, key='round_num')
+        max_size = self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt')
+        total_long = self.trader.get_side_belong_vol(symbol, 'long', False)
+        total_short = self.trader.get_side_belong_vol(symbol, 'short', False)
+
+        lines = [
+            '┌ {} ─ Lev x{:.1f} ─────────────'.format(
+                symbol.split('/')[0].upper(),
+                self.trader.get_info(symbol, key='leverage'),
+            ),
+            '│ 합계  🟢 롱 {:,.{}f} | 🔴 숏 {:,.{}f}'.format(
+                total_long,
+                round_num,
+                total_short,
+                round_num,
+            ),
+            '│',
+            self.render_hedge_side_block(symbol, 'long', max_size, metrics.get('long', {'roe': 0, 'pnl': 0})),
+            '│',
+            self.render_hedge_side_block(symbol, 'short', max_size, metrics.get('short', {'roe': 0, 'pnl': 0})),
+            '└─────────────────────────────',
+        ]
+        return '\n'.join(lines)
+
     async def market_order_hedge(self, target_symbol, position_side, action, vol=0, margin_mode='cross'):
         if margin_mode == 'cross':
             params = {"tdMode": "cross", "mgnMode": "cross", "posSide": position_side}
@@ -821,22 +933,7 @@ class Bot():
         text += '활성화 코인 리스트 - [{}/{} 개]\n\n'.format(n_act, len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
             if self.trader.get_info(symbol, key='go_trade'):
-                text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
-                    symbol.split('/')[0].upper(),
-                    self.trader.get_info(symbol, key='leverage'),
-                    self.trader.get_info(symbol, key='position'),
-                    self.trader.get_info(symbol, key='use_short'),
-                )
-                text += "평균 진입 가격: {:.{}f}\n".format(self.trader.get_info(symbol, key='avg_buy_price'), 
-                                                        self.trader.get_info(symbol, key='precision'))
-                text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
-                    self.trader.get_belong_vol(symbol, False),
-                    self.trader.get_info(symbol, key='round_num'),
-                    self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
-                    self.trader.get_info(symbol, key='round_num'),
-                    self.trader.get_info(symbol, key='buy_cnt'),
-                    self.trader.get_info(symbol, key='max_buy_cnt'),
-                    )
+                text += self.render_oneway_card(symbol)
                 if ti+1 < len(self.trader.get_target_symbols()):
                     text += '\n'
 
@@ -887,28 +984,10 @@ class Bot():
         text += '활성화 코인 리스트 - [{}/{} 개]\n\n'.format(n_act, len(self.trader.get_target_symbols()))
         for ti, symbol in enumerate(self.trader.get_target_symbols()):
             if self.trader.get_info(symbol, key='go_trade'):
-                text += '[{}] - [Lev: x{:.1f} | 포지션: {} | Use Short: {}]\n'.format(
-                    symbol.split('/')[0].upper(),
-                    self.trader.get_info(symbol, key='leverage'),
-                    self.trader.get_info(symbol, key='position'),
-                    self.trader.get_info(symbol, key='use_short'),
-                )
-
-                text += '현재 보유 수량: [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
-                    self.trader.get_belong_vol(symbol, False),
-                    self.trader.get_info(symbol, key='round_num'),
-                    self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
-                    self.trader.get_info(symbol, key='round_num'),
-                    self.trader.get_info(symbol, key='buy_cnt'),
-                    self.trader.get_info(symbol, key='max_buy_cnt'),
-                    )
-
-                avg_price = self.trader.get_info(symbol, key='avg_buy_price')
-                text += "평균 진입 가격: {:.{}f}\n".format(avg_price, self.trader.get_info(symbol, key='precision'))
-                text += "현재 이익률: [{:,.2f} USDT | {:,.2f}%]\n\n".format(
-                    pnl[ti],
-                    roe[ti],
-                )
+                cur_pnl = float(pnl[ti] or 0)
+                cur_roe = float(roe[ti] or 0)
+                text += self.render_oneway_card(symbol, cur_pnl, cur_roe)
+                text += '\n\n'
 
         return text
 
@@ -1299,40 +1378,7 @@ class Bot():
             if not self.trader.get_info(symbol, key='go_trade'):
                 continue
 
-            total_long = self.trader.get_side_belong_vol(symbol, 'long', False)
-            total_short = self.trader.get_side_belong_vol(symbol, 'short', False)
-            round_num = self.trader.get_info(symbol, key='round_num')
-            precision = self.trader.get_info(symbol, key='precision')
-            max_size = self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt')
-            text += '[{}] - [Lev: x{:.1f}]\n'.format(
-                symbol.split('/')[0].upper(),
-                self.trader.get_info(symbol, key='leverage'),
-            )
-            text += '합계 | 롱 {:,.{}f} | 숏 {:,.{}f}\n'.format(
-                total_long,
-                round_num,
-                total_short,
-                round_num,
-            )
-
-            for side in ('long', 'short'):
-                side_metrics = metrics.get(symbol, {}).get(side, {'roe': 0, 'pnl': 0})
-                side_name = '롱' if side == 'long' else '숏'
-                text += '{} | {:,.{}f}/{:,.{}f} | {}/{}\n'.format(
-                    side_name,
-                    self.trader.get_side_belong_vol(symbol, side, False),
-                    round_num,
-                    max_size,
-                    round_num,
-                    self.trader.get_side_info(symbol, side, 'buy_cnt'),
-                    self.trader.get_info(symbol, key='max_buy_cnt'),
-                )
-                text += '  진입 {:.{}f} | 손익 {:+,.2f}U | ROE {:+,.2f}%\n'.format(
-                    self.trader.get_side_info(symbol, side, 'avg_buy_price'),
-                    precision,
-                    float(side_metrics.get('pnl') or 0),
-                    float(side_metrics.get('roe') or 0),
-                )
+            text += self.render_hedge_card(symbol, metrics.get(symbol, {}))
             if ti + 1 < len(self.trader.get_target_symbols()):
                 text += '\n'
 
