@@ -1272,29 +1272,37 @@ class Bot():
             if not self.trader.get_info(symbol, key='go_trade'):
                 continue
 
+            total_long = self.trader.get_side_belong_vol(symbol, 'long', False)
+            total_short = self.trader.get_side_belong_vol(symbol, 'short', False)
+            round_num = self.trader.get_info(symbol, key='round_num')
+            precision = self.trader.get_info(symbol, key='precision')
+            max_size = self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt')
             text += '[{}] - [Lev: x{:.1f}]\n'.format(
                 symbol.split('/')[0].upper(),
                 self.trader.get_info(symbol, key='leverage'),
             )
+            text += '합계 | 롱 {:,.{}f} | 숏 {:,.{}f}\n'.format(
+                total_long,
+                round_num,
+                total_short,
+                round_num,
+            )
 
             for side in ('long', 'short'):
                 side_metrics = metrics.get(symbol, {}).get(side, {'roe': 0, 'pnl': 0})
-                text += '{} : 수량 [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
-                    self.side_label(side),
+                side_name = '롱' if side == 'long' else '숏'
+                text += '{} | {:,.{}f}/{:,.{}f} | {}/{}\n'.format(
+                    side_name,
                     self.trader.get_side_belong_vol(symbol, side, False),
-                    self.trader.get_info(symbol, key='round_num'),
-                    self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
-                    self.trader.get_info(symbol, key='round_num'),
+                    round_num,
+                    max_size,
+                    round_num,
                     self.trader.get_side_info(symbol, side, 'buy_cnt'),
                     self.trader.get_info(symbol, key='max_buy_cnt'),
                 )
-                text += '{} 평균 진입 가격: {:.{}f}\n'.format(
-                    self.side_label(side),
+                text += '  진입 {:.{}f} | 손익 {:+,.2f}U | ROE {:+,.2f}%\n'.format(
                     self.trader.get_side_info(symbol, side, 'avg_buy_price'),
-                    self.trader.get_info(symbol, key='precision'),
-                )
-                text += '{} 현재 이익률: [{:,.2f} USDT | {:,.2f}%]\n'.format(
-                    self.side_label(side),
+                    precision,
                     float(side_metrics.get('pnl') or 0),
                     float(side_metrics.get('roe') or 0),
                 )

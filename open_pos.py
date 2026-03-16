@@ -1,6 +1,8 @@
 import argparse
 import asyncio
 
+import ccxt
+
 from core.trader import Bot
 
 
@@ -41,7 +43,16 @@ async def main():
     bot.trader.config["OKX"]["POSITION_MODE"] = "hedge"
     bot.trader.config["OKX"]["ENVIRONMENT"] = args.env
     bot.setup_api()
-    await bot.ensure_exchange_mode()
+    try:
+        await bot.ensure_exchange_mode()
+    except (ccxt.AuthenticationError, RuntimeError) as exc:
+        message = str(exc)
+        if "50101" in message or "APIKey does not match current environment" in message:
+            raise SystemExit(
+                "OKX API key environment mismatch. Use demo API keys with `--env demo`, "
+                "or run this script with `--env live` when using live API keys."
+            ) from exc
+        raise
 
     symbol = args.symbol or bot.trader.get_target_symbols()[0]
     min_vol = bot.trader.get_info(symbol, key="min_vol")
