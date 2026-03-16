@@ -317,6 +317,7 @@ class Bot():
         """
             ref: https://github.com/ccxt/ccxt/issues/11975
         """
+        applied = False
         if leverage >= 1 and leverage <= 50:
             pos_sides = ['net']
             if self.trader.is_hedge_mode():
@@ -334,8 +335,30 @@ class Bot():
                         target_symbol,
                         params=params
                         )
-                except:
-                    pass
+                    applied = True
+                    print(
+                        f"Set leverage success | symbol={target_symbol} "
+                        f"mode={margin_mode} posSide={pos_side} leverage={leverage}",
+                        flush=True,
+                    )
+                except Exception as exc:
+                    print(
+                        f"Set leverage failed | symbol={target_symbol} "
+                        f"mode={margin_mode} posSide={pos_side} leverage={leverage} error={exc}",
+                        flush=True,
+                    )
+        return applied
+
+    async def sync_configured_leverage(self):
+        for target_symbol in self.trader.get_target_symbols():
+            leverage = self.trader.get_info(target_symbol, key='leverage')
+            cross_applied = await self.set_leverage(target_symbol, leverage, 'cross')
+            isolated_applied = await self.set_leverage(target_symbol, leverage, 'isolated')
+            print(
+                f"Configured leverage sync | symbol={target_symbol} leverage={leverage} "
+                f"cross={cross_applied} isolated={isolated_applied}",
+                flush=True,
+            )
 
     # ========== OKX API ===================
     """
