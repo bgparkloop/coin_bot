@@ -56,6 +56,9 @@ class UserData():
 
         self.load_info()
 
+        for target in self.config['OKX']['TARGET']:
+            self.data[target]['new_buy_roe'] = float(self.data[target]['leverage'])
+
     def _empty_side_state(self):
         return {
             'amt': 0,

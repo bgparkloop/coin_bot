@@ -121,3 +121,22 @@ Before enabling hedge mode in the main service:
 4. Set `POSITION_MODE` in `configs/config_okx.yaml`.
 5. Restart the FastAPI service and confirm startup succeeds without hedge mode errors.
 6. Send a small webhook test and confirm Telegram shows separate long/short state lines.
+
+## Telegram command handling
+
+Telegram commands are handled by polling in the same FastAPI process.
+
+- startup should print:
+  - `Telegram application initialized`
+  - `Telegram polling started`
+- shutdown should print:
+  - `Telegram polling stopped`
+- both `show` and `/show` are accepted
+- both `help` and `/help` are accepted
+- `set ...` and `/set ...` are accepted
+- `trade ...` and `/trade ...` are accepted
+
+Operational note:
+
+- run only one application instance per Telegram bot token
+- multiple uvicorn workers or multiple app processes can cause polling collisions, duplicated handling, or missed updates

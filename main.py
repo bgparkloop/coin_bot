@@ -75,7 +75,7 @@ async def telegram_msg_handler(
     await bot.msg_handler(update, context)
 
 tg_app.add_handler(
-    MessageHandler(filters.TEXT & ~filters.COMMAND, telegram_msg_handler)
+    MessageHandler(filters.TEXT, telegram_msg_handler)
 )
 
 # ======================================================
@@ -100,7 +100,12 @@ async def on_startup():
 
     # Telegram initialize
     await tg_app.initialize()
+    print("Telegram application initialized", flush=True)
     await tg_app.start()
+    if tg_app.updater is None:
+        raise RuntimeError("Telegram updater is not available for polling")
+    await tg_app.updater.start_polling(drop_pending_updates=False)
+    print("Telegram polling started", flush=True)
 
     # 시작 메시지
     start_msg = await bot.start_msg()
@@ -112,6 +117,9 @@ async def on_startup():
 
 @app.on_event("shutdown")
 async def on_shutdown():
+    if tg_app.updater is not None:
+        await tg_app.updater.stop()
+        print("Telegram polling stopped", flush=True)
     await tg_app.stop()
     await tg_app.shutdown()
 

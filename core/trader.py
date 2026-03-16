@@ -122,6 +122,10 @@ class Bot():
             return pos_side
         return side
 
+    def get_dynamic_new_buy_roe(self, target_symbol):
+        leverage = float(self.trader.get_info(target_symbol, key='leverage'))
+        return leverage
+
     def build_order_entry(self, target_symbol, order, trade_type, trade_vol, cur_time, side=None, action=None):
         return {
             'target_symbol': target_symbol,
@@ -402,7 +406,7 @@ class Bot():
                 # 기본 정보
                 # -----------------------------
                 cur_pos   = self.trader.get_info(target_coin, key='position')
-                new_buy_roe = self.trader.get_info(target_coin, key='new_buy_roe')
+                new_buy_roe = self.get_dynamic_new_buy_roe(target_coin)
                 use_short = self.trader.get_info(target_coin, key='use_short')
 
                 _roe, _pnl = roe[ti], pnl[ti]
@@ -933,7 +937,7 @@ class Bot():
                 side_amt = self.trader.get_side_belong_vol(target_coin, side, False)
                 opp_amt = self.trader.get_side_belong_vol(target_coin, opp_side, False)
                 side_buy_cnt = self.trader.get_side_info(target_coin, side, 'buy_cnt')
-                new_buy_roe = self.trader.get_info(target_coin, key='new_buy_roe')
+                new_buy_roe = self.get_dynamic_new_buy_roe(target_coin)
                 max_buy_cnt = self.trader.get_info(target_coin, key='max_buy_cnt')
                 min_vol = self.trader.get_info(target_coin, key='min_vol')
                 buy_time = self.trader.get_side_info(target_coin, side, 'buy_time')
@@ -1366,11 +1370,20 @@ class Bot():
     # Telegram message handler (FIX)
     # ==============================
     async def msg_handler(self, update, context):
-        user_text = update.message.text
-        tokens = user_text.split()
-        print('tokens : ', tokens)
+        if update.message is None or update.message.text is None:
+            return
 
-        if tokens[0].lower() == 'set':
+        user_text = update.message.text.strip()
+        if not user_text:
+            return
+
+        tokens = user_text.split()
+        tokens[0] = tokens[0].lstrip('/').lower()
+        chat_id = update.effective_chat.id if update.effective_chat else None
+        user_id = update.effective_user.id if update.effective_user else None
+        print(f'telegram command | chat_id={chat_id} user_id={user_id} tokens={tokens}', flush=True)
+
+        if tokens[0] == 'set':
             if len(tokens) > 3:
                 for target_symbol in self.trader.get_target_symbols():
                     if tokens[1].lower() in target_symbol.lower():
@@ -1378,6 +1391,7 @@ class Bot():
                         if tokens[2].lower() == 'lev':
                             lev = float(tokens[3])
                             self.trader.update(target_symbol, key='leverage', value=lev)
+                            self.trader.update(target_symbol, key='new_buy_roe', value=lev)
                             await self.set_leverage(target_symbol, lev, 'cross')
                             await self.set_leverage(target_symbol, lev, 'isolated')
 
@@ -1415,6 +1429,8 @@ class Bot():
             msg = await self.status_msg()
             await self.post_message(msg)
 
-        elif tokens[0].lower() == 'show':
+        elif tokens[0] == 'show':
             msg = await self.status_msg()
             await self.post_message(msg)
+        elif tokens[0] == 'help':
+            await self.post_message(self.help_msg())
