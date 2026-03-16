@@ -39,6 +39,8 @@ class Bot():
                         'defaultType': 'swap',
                         "adjustForTimeDifference": True
                     },})
+        if self.trader.get_environment() == 'demo' and hasattr(self.api, 'set_sandbox_mode'):
+            self.api.set_sandbox_mode(True)
 
     def setup(self):
         self.trader = UserData()
@@ -51,6 +53,133 @@ class Bot():
         # pip install "python-telegram-bot==20.3"
 
         self.msgbot = msg_bot
+
+    async def ensure_exchange_mode(self):
+        desired_mode = self.trader.get_position_mode()
+        if desired_mode != 'hedge':
+            return
+
+        current_mode = self.get_exchange_position_mode()
+        if current_mode == 'long_short_mode':
+            return
+
+        try:
+            if hasattr(self.api, 'set_position_mode'):
+                self.api.set_position_mode(True)
+            elif hasattr(self.api, 'setPositionMode'):
+                self.api.setPositionMode(True)
+            elif hasattr(self.api, 'private_post_account_set_position_mode'):
+                self.api.private_post_account_set_position_mode({'posMode': 'long_short_mode'})
+            elif hasattr(self.api, 'privatePostAccountSetPositionMode'):
+                self.api.privatePostAccountSetPositionMode({'posMode': 'long_short_mode'})
+            else:
+                raise RuntimeError('OKX position mode API is not available in ccxt client')
+        except Exception as exc:
+            raise RuntimeError(f'Failed to enable hedge mode on OKX: {exc}') from exc
+
+        current_mode = self.get_exchange_position_mode()
+        if current_mode != 'long_short_mode':
+            raise RuntimeError(f'OKX hedge mode verification failed: {current_mode}')
+
+    def get_exchange_position_mode(self):
+        try:
+            if hasattr(self.api, 'fetch_position_mode'):
+                mode = self.api.fetch_position_mode()
+                if isinstance(mode, dict):
+                    hedged = mode.get('hedged')
+                    if hedged is True:
+                        return 'long_short_mode'
+                    if hedged is False:
+                        return 'net_mode'
+            if hasattr(self.api, 'fetchPositionMode'):
+                mode = self.api.fetchPositionMode()
+                if isinstance(mode, dict):
+                    hedged = mode.get('hedged')
+                    if hedged is True:
+                        return 'long_short_mode'
+                    if hedged is False:
+                        return 'net_mode'
+            if hasattr(self.api, 'private_get_account_config'):
+                resp = self.api.private_get_account_config()
+            elif hasattr(self.api, 'privateGetAccountConfig'):
+                resp = self.api.privateGetAccountConfig()
+            else:
+                return None
+            data = resp.get('data', [])
+            if data:
+                return data[0].get('posMode')
+        except Exception:
+            return None
+        return None
+
+    def get_position_side(self, pos):
+        side = pos.get('side')
+        if side in ('long', 'short'):
+            return side
+        info = pos.get('info', {})
+        pos_side = info.get('posSide')
+        if pos_side in ('long', 'short', 'net'):
+            return pos_side
+        return side
+
+    def build_order_entry(self, target_symbol, order, trade_type, trade_vol, cur_time, side=None, action=None):
+        return {
+            'target_symbol': target_symbol,
+            'order': order,
+            'trade_type': trade_type,
+            'trade_vol': trade_vol,
+            'cur_time': cur_time,
+            'side': side,
+            'action': action,
+        }
+
+    def side_label(self, side):
+        return '롱' if side == 'long' else '숏'
+
+    async def market_order_hedge(self, target_symbol, position_side, action, vol=0, margin_mode='cross'):
+        if margin_mode == 'cross':
+            params = {"tdMode": "cross", "mgnMode": "cross", "posSide": position_side}
+        else:
+            params = {"tdMode": "isolated", "mgnMode": "isolated", "posSide": position_side}
+
+        if action == 'open':
+            side = 'buy' if position_side == 'long' else 'sell'
+        elif action == 'close':
+            side = 'sell' if position_side == 'long' else 'buy'
+        else:
+            raise ValueError(f'Unknown hedge action: {action}')
+
+        print(f'HEDGE {action.upper()} {position_side.upper()}', target_symbol)
+        print()
+
+        return self.api.create_order(
+            symbol=target_symbol,
+            amount=vol,
+            type='market',
+            side=side,
+            params=params,
+        )
+
+    def get_side_metrics(self, positions, target_symbol):
+        result = {
+            'long': {'roe': 0, 'pnl': 0},
+            'short': {'roe': 0, 'pnl': 0},
+        }
+
+        for pos in positions:
+            pos_symbol = pos.get('symbol')
+            if pos_symbol != target_symbol:
+                continue
+            side = self.get_position_side(pos)
+            if side not in result:
+                continue
+            contracts = float(pos.get('contracts') or 0)
+            if contracts <= 0:
+                continue
+            result[side]['roe'] = pos.get('percentage') or 0
+            result[side]['pnl'] = pos.get('unrealizedPnl') or 0
+
+        return result
 
 
     # ========== OKX API ===================
@@ -173,24 +302,40 @@ class Bot():
 
         return roe, pnl
 
+    async def check_positions_hedge(self, t_symbol=None):
+        positions, _ = await self.fetch_positions()
+        metrics = {}
+
+        for target_symbol in self.trader.get_target_symbols():
+            if t_symbol is not None and t_symbol != target_symbol:
+                continue
+            metrics[target_symbol] = self.get_side_metrics(positions, target_symbol)
+
+        return metrics
+
     async def set_leverage(self, target_symbol, leverage=0, margin_mode='cross'):
         """
             ref: https://github.com/ccxt/ccxt/issues/11975
         """
         if leverage >= 1 and leverage <= 50:
-            if margin_mode == 'cross':
-                params = {"tdMode" : "cross", "mgnMode" : "cross", "posSide" : "net"}
-            else:
-                params = {"tdMode" : "isolated", "mgnMode" : "isolated", "posSide" : "net"}
+            pos_sides = ['net']
+            if self.trader.is_hedge_mode():
+                pos_sides = ['long', 'short']
 
-            try:
-                self.api.set_leverage(
-                    leverage,
-                    target_symbol,
-                    params=params
-                    )
-            except:
-                pass
+            for pos_side in pos_sides:
+                if margin_mode == 'cross':
+                    params = {"tdMode" : "cross", "mgnMode" : "cross", "posSide" : pos_side}
+                else:
+                    params = {"tdMode" : "isolated", "mgnMode" : "isolated", "posSide" : pos_side}
+
+                try:
+                    self.api.set_leverage(
+                        leverage,
+                        target_symbol,
+                        params=params
+                        )
+                except:
+                    pass
 
     # ========== OKX API ===================
     """
@@ -200,6 +345,9 @@ class Bot():
         time.sleep(sleep_time)
 
     async def trade(self, symbol, check_pos, trade_vol, cur_close):
+        if self.trader.is_hedge_mode():
+            return await self.trade_hedge(symbol, check_pos, trade_vol, cur_close)
+
         # if not self.go_trade:
         #     return
             
@@ -530,6 +678,9 @@ class Bot():
         return msg_list
 
     async def update_positions(self):
+        if self.trader.is_hedge_mode():
+            return await self.update_positions_hedge()
+
         old_balance = self.trader.get_info(None, 'balance')
 
         positions = self.api.fetch_positions()
@@ -610,6 +761,9 @@ class Bot():
         기타 함수들    
     """
     async def start_msg(self):
+        if self.trader.is_hedge_mode():
+            return await self.start_msg_hedge()
+
         text = "============================================\n"
         text += '현재 시간: {}\n'.format(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),)
         text += "[자동 거래 시작] USER : [{}]\n".format(
@@ -664,6 +818,9 @@ class Bot():
         return text
 
     async def status_msg(self):
+        if self.trader.is_hedge_mode():
+            return await self.status_msg_hedge()
+
         text = "============================================\n"
        
         if self.go_trade:
@@ -725,6 +882,424 @@ class Bot():
                     pnl[ti],
                     roe[ti],
                 )
+
+        return text
+
+    def normalize_target_symbol(self, symbol):
+        if 'USDT.P' in symbol:
+            return symbol.split('USDT.P')[0] + '/USDT:USDT'
+        return symbol.split('/')[0] + '/USDT:USDT'
+
+    async def trade_hedge(self, symbol, check_pos, trade_vol, cur_close):
+        target_coin = self.normalize_target_symbol(symbol)
+        cur_time = time.time()
+        order_list = []
+
+        try:
+            metrics = await self.check_positions_hedge(target_coin)
+
+            for target_symbol in self.trader.get_target_symbols():
+                if target_coin not in target_symbol:
+                    continue
+
+                if not self.trader.get_info(target_coin, key='go_trade'):
+                    continue
+
+                side = check_pos
+                opp_side = 'short' if side == 'long' else 'long'
+                side_amt = self.trader.get_side_belong_vol(target_coin, side, False)
+                opp_amt = self.trader.get_side_belong_vol(target_coin, opp_side, False)
+                side_buy_cnt = self.trader.get_side_info(target_coin, side, 'buy_cnt')
+                new_buy_roe = self.trader.get_info(target_coin, key='new_buy_roe')
+                max_buy_cnt = self.trader.get_info(target_coin, key='max_buy_cnt')
+                min_vol = self.trader.get_info(target_coin, key='min_vol')
+                buy_time = self.trader.get_side_info(target_coin, side, 'buy_time')
+                opp_sell_time = self.trader.get_side_info(target_coin, opp_side, 'sell_time')
+                side_metrics = metrics.get(target_coin, {}).get(side, {'roe': 0, 'pnl': 0})
+                side_roe = float(side_metrics.get('roe') or 0)
+                side_avg = self.trader.get_side_info(target_coin, side, 'avg_buy_price')
+
+                if opp_amt > 0 and cur_time != opp_sell_time:
+                    max_close_contracts = opp_amt * self.trader.get_info(target_coin, key='map_vol')
+                    requested_contracts = min_vol * trade_vol
+                    close_contracts = min(requested_contracts, max_close_contracts)
+                    executed_trade_vol = round(close_contracts / min_vol, self.trader.get_info(target_coin, key='round_num'))
+                    if close_contracts > 0:
+                        order = await self.market_order_hedge(
+                            target_coin,
+                            opp_side,
+                            'close',
+                            vol=close_contracts,
+                        )
+                        order_list.append(
+                            self.build_order_entry(
+                                target_coin,
+                                order,
+                                f'close_{opp_side}',
+                                executed_trade_vol,
+                                cur_time,
+                                side=opp_side,
+                                action='close',
+                            )
+                        )
+                    else:
+                        order_list.append(self.build_order_entry(target_coin, None, None, trade_vol, cur_time))
+                    continue
+
+                if side_amt <= 0:
+                    order = await self.market_order_hedge(
+                        target_coin,
+                        side,
+                        'open',
+                        vol=min_vol * trade_vol,
+                    )
+                    self.trader.update_side_pos_list(target_coin, side, trade_vol)
+                    order_list.append(
+                        self.build_order_entry(
+                            target_coin,
+                            order,
+                            f'open_{side}',
+                            trade_vol,
+                            cur_time,
+                            side=side,
+                            action='open',
+                        )
+                    )
+                    continue
+
+                price_ok = (
+                    (side == 'long' and side_avg > cur_close) or
+                    (side == 'short' and side_avg < cur_close)
+                )
+                can_add = (
+                    cur_time != buy_time and
+                    side_roe < -new_buy_roe and
+                    side_buy_cnt + trade_vol <= max_buy_cnt and
+                    price_ok
+                )
+
+                if can_add:
+                    def calc_max_mult(roe):
+                        if roe < -50:
+                            return 30
+                        if roe < -40:
+                            return 25
+                        if roe < -30:
+                            return 20
+                        if roe < -20:
+                            return 15
+                        return 0
+
+                    max_mult = calc_max_mult(side_roe)
+                    if max_mult > 0:
+                        pos_list = self.trader.get_side_info(target_coin, side, 'position_list')
+                        sum_pos = sum(pos_list)
+                        for mult in range(max_mult, 0, -1):
+                            adjusted_trade_vol = (mult / 10.0) * sum_pos
+                            if side_buy_cnt + adjusted_trade_vol <= max_buy_cnt:
+                                trade_vol = adjusted_trade_vol
+                                break
+
+                    order = await self.market_order_hedge(
+                        target_coin,
+                        side,
+                        'open',
+                        vol=min_vol * trade_vol,
+                    )
+                    self.trader.update_side_pos_list(target_coin, side, trade_vol)
+                    order_list.append(
+                        self.build_order_entry(
+                            target_coin,
+                            order,
+                            f'open_{side}',
+                            trade_vol,
+                            cur_time,
+                            side=side,
+                            action='open',
+                        )
+                    )
+                    continue
+
+                order_list.append(self.build_order_entry(target_coin, None, None, trade_vol, cur_time))
+
+        except ccxt.InvalidOrder:
+            print(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"))
+            print('InvalidOrder Error Raised!')
+            print(traceback.format_exc())
+            del self.api
+            self.setup_api()
+            return
+        except ccxt.InsufficientFunds:
+            print(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"))
+            print('Insufficient Fund Error Raised!')
+            print(traceback.format_exc())
+            del self.api
+            self.setup_api()
+            return
+
+        print('Hedge Order List')
+        for ii, item in enumerate(order_list):
+            print(ii + 1, item)
+            print()
+
+        try:
+            msg_list = await self.post_trade_hedge(order_list)
+
+            for msg in msg_list:
+                await self.post_message(msg)
+                self.sleep(0.1)
+
+            msg = await self.update_positions_hedge()
+            await self.post_message(msg)
+            self.sleep(1)
+        except (telegram.error.NetworkError, telegram.error.BadRequest, telegram.error.TimedOut):
+            print(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"))
+            print('Network 관련 에러 발생!\nBot 재시작!')
+            print(traceback.format_exc())
+        except Exception:
+            print(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"))
+            print('Other Error Raised!')
+            print(traceback.format_exc())
+            del self.api
+            self.setup_api()
+
+    async def post_trade_hedge(self, order_list):
+        msg_list = []
+
+        for entry in order_list:
+            order = entry['order']
+            if order is None or entry['trade_type'] is None:
+                msg_list.append(None)
+                continue
+
+            target_symbol = entry['target_symbol']
+            side = entry['side']
+            action = entry['action']
+            trade_vol = entry['trade_vol']
+            cur_time = entry['cur_time']
+            order_info = await self.fetch_order(target_symbol, order['id'])
+            self.sleep(1)
+
+            now_str = datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S")
+            round_num = self.trader.get_info(target_symbol, key='round_num')
+            filled_vol = round(float(order_info['amount']) / self.trader.get_info(target_symbol, key='map_vol'), round_num)
+            filled_price = float(order_info['price'])
+
+            if action == 'open':
+                cur_buy_cnt = self.trader.get_side_info(target_symbol, side, 'buy_cnt')
+                self.trader.update_side_info(target_symbol, side, 'buy_cnt', cur_buy_cnt + trade_vol)
+                self.trader.update_side_info(target_symbol, side, 'buy_time', cur_time)
+                await self.update_positions_hedge()
+                self.set_balance()
+                trade_chat = (
+                    f"현재 시간 : {now_str}\n"
+                    f"[{self.side_label(side)} 진입 - {target_symbol.split('/')[0].upper()}] "
+                    f"- 수량 : {filled_vol:.{round_num}f}\n"
+                    f"평균 진입 가격 : {filled_price:.{self.trader.get_info(target_symbol, key='precision')}f}\n"
+                    f"현재 보유 수량 : "
+                    f"[{self.trader.get_side_belong_vol(target_symbol, side, False):,.{round_num}f}/"
+                    f"{self.trader.get_buy_vol(target_symbol) * self.trader.get_info(target_symbol, key='max_buy_cnt'):,.{round_num}f}] "
+                    f"[{self.trader.get_side_info(target_symbol, side, 'buy_cnt')}/{self.trader.get_info(target_symbol, key='max_buy_cnt')}]\n"
+                )
+                await self.trader.save_info()
+                msg_list.append(trade_chat)
+                continue
+
+            total_profit = self.trader.calc_side_profit(target_symbol, side, filled_price, filled_vol)
+            ratio = abs(total_profit) / await self.get_balance()
+            cum_profit = self.trader.get_info(None, key='cum_profit')
+            cum_pnl = self.trader.get_info(None, key='cum_pnl')
+            avg_entry_price = self.trader.get_side_info(target_symbol, side, 'avg_buy_price')
+
+            self.trader.update(None, key='tot_cnt', value=self.trader.get_info(None, key='tot_cnt') + 1)
+            if total_profit < 0:
+                ratio = -ratio
+                profit_type = 'LOSS'
+            else:
+                self.trader.update(None, key='win_cnt', value=self.trader.get_info(None, key='win_cnt') + 1)
+                profit_type = 'PROFIT'
+
+            self.trader.update_side_info(target_symbol, side, 'sell_time', cur_time)
+            self.trader.update(None, key='cum_profit', value=cum_profit + total_profit)
+            self.trader.update(None, key='cum_pnl', value=cum_pnl + ratio)
+            await self.update_positions_hedge()
+            self.set_balance()
+
+            trade_chat = (
+                f"현재 시간 : {now_str}\n"
+                f"[{self.side_label(side)} 청산 - {target_symbol.split('/')[0].upper()}] - [{profit_type}]\n"
+                f"평균 진입 가격 : {avg_entry_price:.{self.trader.get_info(target_symbol, key='precision')}f}\n"
+                f"청산 수량 : {filled_vol:.{round_num}f}\n"
+                f"남은 수량 : {self.trader.get_side_belong_vol(target_symbol, side, False):.{round_num}f}\n"
+                f"평균 청산 가격 : {filled_price:.{self.trader.get_info(target_symbol, key='precision')}f}\n"
+                f"현재 거래 이익 : {total_profit:,.2f} USDT [{ratio * 100:,.2f}%]\n"
+                f"누적 거래 이익 : {self.trader.get_info(None, key='cum_profit'):,.2f} USDT "
+                f"[{self.trader.get_info(None, key='cum_pnl') * 100:,.2f}%]\n"
+            )
+            await self.trader.save_info()
+            msg_list.append(trade_chat)
+
+        return msg_list
+
+    async def update_positions_hedge(self):
+        old_balance = self.trader.get_info(None, 'balance')
+        positions = self.api.fetch_positions()
+        check = False
+        msg = None
+
+        self.set_balance()
+
+        for target_symbol in self.trader.get_target_symbols():
+            found = {'long': False, 'short': False}
+            div_num = float(self.trader.get_info(target_symbol, key='map_vol'))
+
+            for pos in positions:
+                pos_symbol = pos.get('symbol')
+                if pos_symbol != target_symbol:
+                    continue
+
+                side = self.get_position_side(pos)
+                if side not in ('long', 'short'):
+                    continue
+
+                n_contracts = float(pos.get('contracts') or 0)
+                if n_contracts <= 0:
+                    continue
+
+                found[side] = True
+                entry_price = float(pos.get('entryPrice') or pos.get('entry_price') or 0)
+                belong_vol = n_contracts / div_num
+                prev_amt = self.trader.get_side_belong_vol(target_symbol, side, False)
+
+                self.trader.update_side_info(target_symbol, side, 'avg_buy_price', entry_price)
+                self.trader.update_side_info(target_symbol, side, 'amt', belong_vol)
+
+                if abs(prev_amt - belong_vol) > 1e-12:
+                    check = True
+
+                cnt = self.trader.recal_side_pos_list(target_symbol, side, belong_vol)
+                self.trader.update_side_info(target_symbol, side, 'buy_cnt', cnt)
+
+            for side in ('long', 'short'):
+                if found[side]:
+                    continue
+                if self.trader.get_side_belong_vol(target_symbol, side, False) != 0:
+                    check = True
+                self.trader.reset_side_info(target_symbol, side)
+
+            long_amt = self.trader.get_side_belong_vol(target_symbol, 'long', False)
+            short_amt = self.trader.get_side_belong_vol(target_symbol, 'short', False)
+            if long_amt > 0 and short_amt > 0:
+                summary_pos = 'hedge'
+            elif long_amt > 0:
+                summary_pos = 'long'
+            elif short_amt > 0:
+                summary_pos = 'short'
+            else:
+                summary_pos = None
+
+            self.trader.update(target_symbol, key='position', value=summary_pos)
+            self.trader.update(target_symbol, key='amt', value=long_amt + short_amt)
+            self.trader.update(target_symbol, key='buy_cnt', value=(
+                self.trader.get_side_info(target_symbol, 'long', 'buy_cnt') +
+                self.trader.get_side_info(target_symbol, 'short', 'buy_cnt')
+            ))
+
+        if check or old_balance != await self.get_balance():
+            if check:
+                msg = await self.status_msg_hedge()
+            self.set_balance()
+            return msg
+
+        return msg
+
+    async def start_msg_hedge(self):
+        total_sum, cur_balance, unpnl = self.get_cur_balance()
+        text = "============================================\n"
+        text += '현재 시간: {}\n'.format(datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),)
+        text += "[자동 거래 시작] USER : [{}]\n".format(self.trader.get_info(None, 'user_name'))
+        text += "현재 모드 : [hedge]\n"
+        text += "현재 계좌\nFree: [{:.2f}/{:.2f} USDT]\n".format(
+            self.trader.get_info(None, 'balance'),
+            cur_balance,
+        )
+        text += '현재 누적 거래 이익: {:,.2f} USDT [{:,.2f}%]\n'.format(
+            self.trader.get_info(None, key='cum_profit'),
+            self.trader.get_info(None, key='cum_pnl') * 100,
+        )
+        text += '현재 미실현 손익: {:,.2f} USDT [{:,.2f}%]\n'.format(
+            unpnl, (unpnl / total_sum) * 100,
+        )
+        text += await self.render_hedge_positions()
+        text += "============================================"
+        return text
+
+    async def status_msg_hedge(self):
+        total_sum, cur_balance, unpnl = self.get_cur_balance()
+        metrics = await self.check_positions_hedge()
+        text = "============================================\n"
+        text += '[거래 중]\n' if self.go_trade else '[거래 일시중지]\n'
+        text += "[현재 정보] USER: [{}]\n현재 시간 : {}\n".format(
+            self.trader.get_info(None, 'user_name'),
+            datetime.now(timezone('Asia/Seoul')).strftime("%m/%d/%Y, %H:%M:%S"),
+        )
+        text += "현재 모드 : [hedge]\n"
+        text += "현재 계좌\nFree: [{:.2f}/{:.2f} USDT]\n".format(
+            self.trader.get_info(None, 'balance'),
+            cur_balance,
+        )
+        text += '현재 누적 거래 이익: {:,.2f} USDT [{:,.2f}%]\n'.format(
+            self.trader.get_info(None, key='cum_profit'),
+            self.trader.get_info(None, key='cum_pnl') * 100,
+        )
+        text += '현재 미실현 손익: {:,.2f} USDT [{:,.2f}%]\n'.format(
+            unpnl, (unpnl / total_sum) * 100,
+        )
+        text += await self.render_hedge_positions(metrics)
+        return text
+
+    async def render_hedge_positions(self, metrics=None):
+        if metrics is None:
+            metrics = await self.check_positions_hedge()
+
+        n_act = 0
+        for symbol in self.trader.get_target_symbols():
+            if self.trader.get_info(symbol, key='go_trade'):
+                n_act += 1
+
+        text = '활성화 코인 리스트 - [{}/{} 개]\n\n'.format(n_act, len(self.trader.get_target_symbols()))
+        for ti, symbol in enumerate(self.trader.get_target_symbols()):
+            if not self.trader.get_info(symbol, key='go_trade'):
+                continue
+
+            text += '[{}] - [Lev: x{:.1f}]\n'.format(
+                symbol.split('/')[0].upper(),
+                self.trader.get_info(symbol, key='leverage'),
+            )
+
+            for side in ('long', 'short'):
+                side_metrics = metrics.get(symbol, {}).get(side, {'roe': 0, 'pnl': 0})
+                text += '{} : 수량 [{:,.{}f} / {:,.{}f}] [{}/{}]\n'.format(
+                    self.side_label(side),
+                    self.trader.get_side_belong_vol(symbol, side, False),
+                    self.trader.get_info(symbol, key='round_num'),
+                    self.trader.get_buy_vol(symbol) * self.trader.get_info(symbol, key='max_buy_cnt'),
+                    self.trader.get_info(symbol, key='round_num'),
+                    self.trader.get_side_info(symbol, side, 'buy_cnt'),
+                    self.trader.get_info(symbol, key='max_buy_cnt'),
+                )
+                text += '{} 평균 진입 가격: {:.{}f}\n'.format(
+                    self.side_label(side),
+                    self.trader.get_side_info(symbol, side, 'avg_buy_price'),
+                    self.trader.get_info(symbol, key='precision'),
+                )
+                text += '{} 현재 이익률: [{:,.2f} USDT | {:,.2f}%]\n'.format(
+                    self.side_label(side),
+                    float(side_metrics.get('pnl') or 0),
+                    float(side_metrics.get('roe') or 0),
+                )
+            if ti + 1 < len(self.trader.get_target_symbols()):
+                text += '\n'
 
         return text
 

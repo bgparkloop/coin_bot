@@ -95,6 +95,8 @@ async def periodic_task(interval: int):
 # ======================================================
 @app.on_event("startup")
 async def on_startup():
+    await bot.ensure_exchange_mode()
+
     # Telegram initialize
     await tg_app.initialize()
     await tg_app.start()

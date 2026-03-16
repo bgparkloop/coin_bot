@@ -19,6 +19,8 @@ class UserData():
     def __init__(self):
         config = read_config_okx()
         self.config = config
+        self.config['OKX'].setdefault('POSITION_MODE', 'one_way')
+        self.config['OKX'].setdefault('ENVIRONMENT', 'live')
 
         self.data = {}
         self.user_name = self.config['USER']['NAME']
@@ -44,14 +46,37 @@ class UserData():
             self.data[target]['buy_cnt'] = 0
             self.data[target]['max_buy_cnt'] = 500
             self.data[target]['avg_buy_price'] = 0
-            self.data[target]['position_list'] = 0
+            self.data[target]['position_list'] = []
             self.data[target]['buy_time'] = 0
             self.data[target]['sell_time'] = 0
+            self.data[target]['positions'] = {
+                'long': self._empty_side_state(),
+                'short': self._empty_side_state(),
+            }
 
         self.load_info()
 
+    def _empty_side_state(self):
+        return {
+            'amt': 0,
+            'buy_cnt': 0,
+            'avg_buy_price': 0,
+            'position_list': [],
+            'buy_time': 0,
+            'sell_time': 0,
+        }
+
     def get_target_symbols(self):
         return self.config['OKX']['TARGET']
+
+    def get_position_mode(self):
+        return self.config['OKX'].get('POSITION_MODE', 'one_way')
+
+    def get_environment(self):
+        return self.config['OKX'].get('ENVIRONMENT', 'live')
+
+    def is_hedge_mode(self):
+        return self.get_position_mode() == 'hedge'
 
     def update(self, target_symbol, key, value=None):
         assert key is not None, f"{target_symbol} - Error! Key shouldn't None!"
@@ -76,6 +101,24 @@ class UserData():
 
     def remove_pos_list(self, target_symbol):
         return self.data[target_symbol]['position_list'].pop()
+
+    def get_side_info(self, target_symbol, side, key):
+        return self.data[target_symbol]['positions'][side][key]
+
+    def update_side_info(self, target_symbol, side, key, value):
+        self.data[target_symbol]['positions'][side][key] = value
+
+    def reset_side_info(self, target_symbol, side):
+        self.data[target_symbol]['positions'][side] = self._empty_side_state()
+
+    def update_side_pos_list(self, target_symbol, side, qty):
+        self.data[target_symbol]['positions'][side]['position_list'].append(qty)
+
+    def remove_side_pos_list(self, target_symbol, side):
+        pos_list = self.data[target_symbol]['positions'][side]['position_list']
+        if not pos_list:
+            return 0
+        return pos_list.pop()
 
     def recal_pos_list(self, target_symbol, belong_vol):
         # -----------------------------
@@ -188,6 +231,85 @@ class UserData():
 
         return int(cum_cnt)
 
+    def recal_side_pos_list(self, target_symbol, side, belong_vol):
+        position_list = []
+        prev_positions = self.get_side_info(target_symbol, side, 'position_list')
+        max_cnt = self.get_info(target_symbol, key='max_buy_cnt')
+        buy_vol = self.get_buy_vol(target_symbol)
+
+        if buy_vol <= 0:
+            self.update_side_info(target_symbol, side, 'position_list', [])
+            return 0
+
+        real_cnt = int(round(belong_vol / buy_vol))
+        if belong_vol > 0 and real_cnt == 0:
+            real_cnt = 1
+
+        buy_ratio = real_cnt / max_cnt
+
+        if buy_ratio > 0.5:
+            last_qty = real_cnt // 2
+        elif buy_ratio > 0.25:
+            last_qty = real_cnt // 3
+        else:
+            last_qty = 0
+
+        base_cnt = real_cnt - last_qty if last_qty > 0 else real_cnt
+
+        def split_by_4(cnt):
+            result = []
+            while cnt > 0:
+                if cnt >= 4:
+                    result.append(4)
+                    cnt -= 4
+                else:
+                    result.append(cnt)
+                    break
+            return result
+
+        cum_cnt = 0
+
+        if prev_positions:
+            matched = False
+
+            for qty in prev_positions:
+                if matched:
+                    break
+
+                used = 0
+                for _ in range(int(qty)):
+                    if cum_cnt == base_cnt:
+                        matched = True
+                        break
+                    used += 1
+                    cum_cnt += 1
+
+                if matched:
+                    position_list.append(used)
+                    break
+                else:
+                    position_list.append(qty)
+
+            remain = base_cnt - cum_cnt
+            if last_qty == 0 and remain > 0:
+                position_list.extend(split_by_4(remain))
+                cum_cnt += remain
+
+        else:
+            position_list.extend(split_by_4(base_cnt))
+            cum_cnt = base_cnt
+
+        if last_qty > 0:
+            position_list.append(last_qty)
+            cum_cnt += last_qty
+
+        self.update_side_info(target_symbol, side, 'position_list', position_list)
+
+        if cum_cnt > 0 and cum_cnt * buy_vol < belong_vol:
+            return max(real_cnt, int(cum_cnt))
+
+        return int(cum_cnt)
+
     def get_telegram_id(self):
         return self.config['TELEGRAM']['ID']
 
@@ -210,6 +332,20 @@ class UserData():
 
         return profit
 
+    def calc_side_profit(self, target_symbol, side, filled_price, filled_vol):
+        avg_price = self.get_side_info(target_symbol, side, 'avg_buy_price')
+
+        if side == 'long':
+            diff = (filled_price - avg_price)
+        else:
+            diff = (avg_price - filled_price)
+
+        profit = ((diff * filled_vol) * (1 - self.commition * 2))
+
+        print('side profit : ', side, profit, diff, filled_vol, self.commition)
+
+        return profit
+
     def get_real_trade_vol(self, target_symbol, trade_vol):
         min_vol = self.get_info(target_symbol, key='min_vol')
         map_vol = self.get_info(target_symbol, key='map_vol')
@@ -225,6 +361,15 @@ class UserData():
             return round(amt * map_vol, rnd_num)
         else:
             return amt
+
+    def get_side_belong_vol(self, target_symbol, side, is_trade=True):
+        amt = self.get_side_info(target_symbol, side, 'amt')
+        map_vol = self.get_info(target_symbol, key='map_vol')
+        rnd_num = self.get_info(target_symbol, key='round_num')
+
+        if is_trade:
+            return round(amt * map_vol, rnd_num)
+        return amt
 
     def get_buy_vol(self, target_symbol):
         min_vol = self.get_info(target_symbol, key='min_vol')
