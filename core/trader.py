@@ -1031,7 +1031,7 @@ class Bot():
                     close_contracts = min(requested_contracts, max_close_contracts)
                     executed_trade_vol = round(close_contracts / min_vol, self.trader.get_info(target_coin, key='round_num'))
                     if close_contracts > 0:
-                        order = await self.market_order_hedge(
+                        close_order = await self.market_order_hedge(
                             target_coin,
                             opp_side,
                             'close',
@@ -1040,12 +1040,30 @@ class Bot():
                         order_list.append(
                             self.build_order_entry(
                                 target_coin,
-                                order,
+                                close_order,
                                 f'close_{opp_side}',
                                 executed_trade_vol,
                                 cur_time,
                                 side=opp_side,
                                 action='close',
+                            )
+                        )
+                        open_order = await self.market_order_hedge(
+                            target_coin,
+                            side,
+                            'open',
+                            vol=close_contracts,
+                        )
+                        self.trader.update_side_pos_list(target_coin, side, executed_trade_vol)
+                        order_list.append(
+                            self.build_order_entry(
+                                target_coin,
+                                open_order,
+                                f'open_{side}',
+                                executed_trade_vol,
+                                cur_time,
+                                side=side,
+                                action='open',
                             )
                         )
                     else:
