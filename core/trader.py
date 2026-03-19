@@ -159,6 +159,17 @@ class Bot():
             return '🔴'
         return '⚪'
 
+    def get_short_signal_wait_text(self, symbol, has_short_position):
+        if has_short_position:
+            return None
+
+        wait_count = int(self.trader.get_info(symbol, key='short_signal_count') or 0)
+        if wait_count <= 0:
+            return None
+
+        capped_count = min(wait_count, 3)
+        return f'⏳ 숏 대기 {capped_count}/3'
+
     def render_oneway_card(self, symbol, pnl_value=None, roe_value=None):
         round_num = self.trader.get_info(symbol, key='round_num')
         precision = self.trader.get_info(symbol, key='precision')
@@ -195,6 +206,13 @@ class Bot():
                 )
             )
 
+        wait_text = self.get_short_signal_wait_text(
+            symbol,
+            self.trader.get_info(symbol, key='position') == 'short',
+        )
+        if wait_text is not None:
+            lines.append(f'│ {wait_text}')
+
         lines.append('└─────────────────────────────')
         return '\n'.join(lines)
 
@@ -225,6 +243,15 @@ class Bot():
                 pnl_value,
             ),
             '│   ROE   {:+,.2f}%'.format(roe_value),
+            *(
+                [f'│   {wait_text}']
+                if side == 'short'
+                and (wait_text := self.get_short_signal_wait_text(
+                    symbol,
+                    self.trader.get_side_belong_vol(symbol, 'short', False) > 0,
+                )) is not None
+                else []
+            ),
         ])
 
     def render_hedge_card(self, symbol, metrics):
@@ -483,6 +510,16 @@ class Bot():
     def sleep(self, sleep_time):
         time.sleep(sleep_time)
 
+    def reset_short_signal_count(self, target_symbol):
+        if self.trader.get_info(target_symbol, key='short_signal_count') != 0:
+            self.trader.update(target_symbol, key='short_signal_count', value=0)
+
+    def advance_short_signal_count(self, target_symbol):
+        cur_count = int(self.trader.get_info(target_symbol, key='short_signal_count') or 0)
+        cur_count += 1
+        self.trader.update(target_symbol, key='short_signal_count', value=cur_count)
+        return cur_count
+
     async def trade(self, symbol, check_pos, trade_vol, cur_close):
         if self.trader.is_hedge_mode():
             return await self.trade_hedge(symbol, check_pos, trade_vol, cur_close)
@@ -524,6 +561,7 @@ class Bot():
                 _roe, _pnl = roe[ti], pnl[ti]
                 cur_time = time.time()
                 cur_amt = self.trader.get_belong_vol(target_coin, False)
+                short_signal_count = self.trader.get_info(target_coin, key='short_signal_count')
 
                 buy_time  = self.trader.get_info(target_coin, key='buy_time')
                 sell_time = self.trader.get_info(target_coin, key='sell_time')
@@ -532,6 +570,9 @@ class Bot():
                     order_list.append([target_coin, None, None, trade_vol, cur_time])
 
                 print('ti: ', ti, target_symbol, cur_pos, _roe, _pnl, check_pos)
+
+                if check_pos != 'short':
+                    self.reset_short_signal_count(target_coin)
 
                 # =============================
                 # 1️⃣ 신규 진입
@@ -542,8 +583,16 @@ class Bot():
                         continue
 
                     if check_pos == 'short' and not use_short:
+                        self.reset_short_signal_count(target_coin)
                         append_none()
                         continue
+
+                    if check_pos == 'short':
+                        short_signal_count = self.advance_short_signal_count(target_coin)
+                        if short_signal_count < 3:
+                            append_none()
+                            continue
+                        self.reset_short_signal_count(target_coin)
 
                     buy_qty = self.trader.get_info(target_coin, key='min_vol') * trade_vol
 
@@ -1024,6 +1073,15 @@ class Bot():
                 side_metrics = metrics.get(target_coin, {}).get(side, {'roe': 0, 'pnl': 0})
                 side_roe = float(side_metrics.get('roe') or 0)
                 side_avg = self.trader.get_side_info(target_coin, side, 'avg_buy_price')
+                short_confirmed = True
+
+                if side != 'short':
+                    self.reset_short_signal_count(target_coin)
+                elif side_amt > 0:
+                    self.reset_short_signal_count(target_coin)
+                else:
+                    short_signal_count = self.advance_short_signal_count(target_coin)
+                    short_confirmed = short_signal_count >= 3
 
                 if opp_amt > 0 and cur_time != opp_sell_time:
                     max_close_contracts = opp_amt * self.trader.get_info(target_coin, key='map_vol')
@@ -1048,29 +1106,35 @@ class Bot():
                                 action='close',
                             )
                         )
-                        open_order = await self.market_order_hedge(
-                            target_coin,
-                            side,
-                            'open',
-                            vol=close_contracts,
-                        )
-                        self.trader.update_side_pos_list(target_coin, side, executed_trade_vol)
-                        order_list.append(
-                            self.build_order_entry(
+                        if side != 'short' or short_confirmed:
+                            open_order = await self.market_order_hedge(
                                 target_coin,
-                                open_order,
-                                f'open_{side}',
-                                executed_trade_vol,
-                                cur_time,
-                                side=side,
-                                action='open',
+                                side,
+                                'open',
+                                vol=close_contracts,
                             )
-                        )
+                            self.trader.update_side_pos_list(target_coin, side, executed_trade_vol)
+                            if side == 'short':
+                                self.reset_short_signal_count(target_coin)
+                            order_list.append(
+                                self.build_order_entry(
+                                    target_coin,
+                                    open_order,
+                                    f'open_{side}',
+                                    executed_trade_vol,
+                                    cur_time,
+                                    side=side,
+                                    action='open',
+                                )
+                            )
                     else:
                         order_list.append(self.build_order_entry(target_coin, None, None, trade_vol, cur_time))
                     continue
 
                 if side_amt <= 0:
+                    if side == 'short' and not short_confirmed:
+                        order_list.append(self.build_order_entry(target_coin, None, None, trade_vol, cur_time))
+                        continue
                     order = await self.market_order_hedge(
                         target_coin,
                         side,
@@ -1078,6 +1142,8 @@ class Bot():
                         vol=min_vol * trade_vol,
                     )
                     self.trader.update_side_pos_list(target_coin, side, trade_vol)
+                    if side == 'short':
+                        self.reset_short_signal_count(target_coin)
                     order_list.append(
                         self.build_order_entry(
                             target_coin,

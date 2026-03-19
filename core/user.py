@@ -49,6 +49,7 @@ class UserData():
             self.data[target]['position_list'] = []
             self.data[target]['buy_time'] = 0
             self.data[target]['sell_time'] = 0
+            self.data[target]['short_signal_count'] = 0
             self.data[target]['positions'] = {
                 'long': self._empty_side_state(),
                 'short': self._empty_side_state(),
