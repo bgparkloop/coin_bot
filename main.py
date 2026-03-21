@@ -52,6 +52,8 @@ def configure_logging():
 # ======================================================
 app = FastAPI()
 configure_logging()
+logger = logging.getLogger(__name__)
+background_tasks = set()
 
 # ======================================================
 # Telegram Bot
@@ -143,9 +145,19 @@ async def receive_webhook(request: Request):
     body = await request.body()
     text = body.decode("utf-8")
 
-    print("Webhook:", text)
+    print("Webhook queued:", text)
 
-    tokens = text.split(",")
+    task = asyncio.create_task(process_webhook(text))
+    background_tasks.add(task)
+    task.add_done_callback(_on_webhook_task_done)
+
+    return {"status": "accepted"}
+
+
+async def process_webhook(text: str):
+    tokens = [token.strip() for token in text.split(",")]
+    if len(tokens) < 2:
+        raise ValueError(f"Invalid webhook payload: {text}")
 
     if tokens[0] == "buy":
         position = "long"
@@ -182,4 +194,10 @@ async def receive_webhook(request: Request):
             cur_close=cur_close,
         )
 
-    return {"status": "ok"}
+
+def _on_webhook_task_done(task: asyncio.Task):
+    background_tasks.discard(task)
+    try:
+        task.result()
+    except Exception:
+        logger.exception("Webhook background task failed")
