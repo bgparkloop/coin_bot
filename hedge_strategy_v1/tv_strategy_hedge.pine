@@ -1,0 +1,169 @@
+//@version=5
+// Main strategy backtests only the main position. Hedge overlay is emitted as alerts/visuals.
+strategy("Low Leverage Hedge Strategy v1", overlay=true, pyramiding=3, commission_type=strategy.commission.percent, commission_value=0.05, slippage=8, initial_capital=10000, process_orders_on_close=true)
+
+trendModel = input.string("VWAP_EMA", "Trend Model", options=["EMA", "STRUCTURE", "VWAP_EMA"])
+volumeModel = input.string("OBV_CONFIRM", "Volume Model", options=["VOL_EMA_MULT", "RELATIVE_VOLUME", "OBV_CONFIRM"])
+hedgeMode = input.string("DEFENSIVE_ONLY", "Hedge Mode", options=["DEFENSIVE_ONLY", "OFF"])
+entryModel = input.string("PULLBACK_ONLY", "Entry Model", options=["PULLBACK_ONLY"])
+qualityPreset = input.string("conservative", "Quality Preset", options=["conservative", "balanced"])
+
+atrLen = input.int(14, "ATR Length", minval=1)
+baseQty = input.float(1.0, "Base Position Size", step=0.25)
+defaultHedge = input.float(0.25, "Default Hedge Ratio", options=[0.25, 0.5])
+ema15FastLen = input.int(20, "15m Fast EMA", minval=1)
+ema15SlowLen = input.int(50, "15m Slow EMA", minval=1)
+ema60FastLen = input.int(20, "60m Fast EMA", minval=1)
+ema60SlowLen = input.int(50, "60m Slow EMA", minval=1)
+ema240TrendLen = input.int(50, "240m Trend EMA", minval=1)
+volumeEmaLen = input.int(20, "Volume EMA Length", minval=1)
+structureLookback = input.int(3, "Structure Lookback", minval=1)
+obvEmaLen = input.int(20, "OBV EMA Length", minval=1)
+
+atrv = ta.atr(atrLen)
+ema15Fast = ta.ema(close, ema15FastLen)
+ema15Slow = ta.ema(close, ema15SlowLen)
+ema60Fast = request.security(syminfo.tickerid, "60", ta.ema(close, ema60FastLen), barmerge.gaps_off, barmerge.lookahead_off)
+ema60Slow = request.security(syminfo.tickerid, "60", ta.ema(close, ema60SlowLen), barmerge.gaps_off, barmerge.lookahead_off)
+ema240Trend = request.security(syminfo.tickerid, "240", ta.ema(close, ema240TrendLen), barmerge.gaps_off, barmerge.lookahead_off)
+close60 = request.security(syminfo.tickerid, "60", close, barmerge.gaps_off, barmerge.lookahead_off)
+high60 = request.security(syminfo.tickerid, "60", high, barmerge.gaps_off, barmerge.lookahead_off)
+low60 = request.security(syminfo.tickerid, "60", low, barmerge.gaps_off, barmerge.lookahead_off)
+close240 = request.security(syminfo.tickerid, "240", close, barmerge.gaps_off, barmerge.lookahead_off)
+high240 = request.security(syminfo.tickerid, "240", high, barmerge.gaps_off, barmerge.lookahead_off)
+low240 = request.security(syminfo.tickerid, "240", low, barmerge.gaps_off, barmerge.lookahead_off)
+vwapNow = ta.vwap(hlc3)
+volEma = ta.ema(volume, volumeEmaLen)
+volumeRatio = volEma > 0 ? volume / volEma : 0.0
+bodySize = math.abs(close - open)
+bodyRatio = atrv > 0 ? bodySize / atrv : 0.0
+obv = ta.cum(math.sign(ta.change(close)) * volume)
+obvEma = ta.ema(obv, obvEmaLen)
+
+regimeBars = qualityPreset == "conservative" ? 2 : 1
+pullbackToleranceAtr = qualityPreset == "conservative" ? 0.30 : 0.40
+extensionLimitAtr = qualityPreset == "conservative" ? 0.70 : 0.95
+minBodyAtr = qualityPreset == "conservative" ? 0.20 : 0.15
+entryCooldownBars = qualityPreset == "conservative" ? 8 : 5
+volumePullbackMult = qualityPreset == "conservative" ? 1.10 : 1.00
+hedgeAdverseAtr = qualityPreset == "conservative" ? 0.80 : 0.60
+trailAtrMult = qualityPreset == "conservative" ? 1.8 : 1.5
+
+emaBullBias = close > ema60Fast and ema60Fast > ema60Slow and ema60Slow > ema240Trend
+emaBearBias = close < ema60Fast and ema60Fast < ema60Slow and ema60Slow < ema240Trend
+structureBullBias = high60 > high60[structureLookback] and low60 > low60[structureLookback] and close240 >= close240[1]
+structureBearBias = high60 < high60[structureLookback] and low60 < low60[structureLookback] and close240 <= close240[1]
+vwapBullBias = close > vwapNow and ema60Fast > ema60Slow and ema60Slow > ema240Trend
+vwapBearBias = close < vwapNow and ema60Fast < ema60Slow and ema60Slow < ema240Trend
+
+biasBull = switch trendModel
+    "STRUCTURE" => structureBullBias
+    "VWAP_EMA" => vwapBullBias
+    => emaBullBias
+biasBear = switch trendModel
+    "STRUCTURE" => structureBearBias
+    "VWAP_EMA" => vwapBearBias
+    => emaBearBias
+biasBull := biasBull and not biasBear
+biasBear := biasBear and not biasBull
+biasNeutral = not biasBull and not biasBear
+
+bullConfirmed = biasBull and ta.barssince(not biasBull) >= regimeBars - 1
+bearConfirmed = biasBear and ta.barssince(not biasBear) >= regimeBars - 1
+
+volumeReadyBull = switch volumeModel
+    "RELATIVE_VOLUME" => volume >= ta.highest(volume, volumeEmaLen)[1] * 0.75
+    "OBV_CONFIRM" => obv > obvEma and volumeRatio >= 0.9
+    => volumeRatio >= volumePullbackMult
+volumeReadyBear = switch volumeModel
+    "RELATIVE_VOLUME" => volume >= ta.highest(volume, volumeEmaLen)[1] * 0.75
+    "OBV_CONFIRM" => obv < obvEma and volumeRatio >= 0.9
+    => volumeRatio >= volumePullbackMult
+
+bodyReadyBull = close > open and bodyRatio >= minBodyAtr
+bodyReadyBear = close < open and bodyRatio >= minBodyAtr
+notExtendedLong = close >= ema15Fast and (close - ema15Fast) <= atrv * extensionLimitAtr
+notExtendedShort = close <= ema15Fast and (ema15Fast - close) <= atrv * extensionLimitAtr
+pullbackReadyLong = bullConfirmed and ema15Fast > ema15Slow and ta.rising(ema15Fast, 2) and low <= ema15Fast + atrv * pullbackToleranceAtr and close > ema15Fast and notExtendedLong
+pullbackReadyShort = bearConfirmed and ema15Fast < ema15Slow and ta.falling(ema15Fast, 2) and high >= ema15Fast - atrv * pullbackToleranceAtr and close < ema15Fast and notExtendedShort
+
+var int lastLongEntryBar = -100000
+var int lastShortEntryBar = -100000
+canLongEntry = (bar_index - lastLongEntryBar) > entryCooldownBars
+canShortEntry = (bar_index - lastShortEntryBar) > entryCooldownBars
+
+entryReadyLong = entryModel == "PULLBACK_ONLY" and pullbackReadyLong and volumeReadyBull and bodyReadyBull and canLongEntry
+entryReadyShort = entryModel == "PULLBACK_ONLY" and pullbackReadyShort and volumeReadyBear and bodyReadyBear and canShortEntry
+
+hedgeLongSignal = hedgeMode != "OFF" and strategy.position_size < 0 and close > ema15Fast and ta.rising(ema15Fast, 2) and volumeReadyBull and (close - strategy.position_avg_price) >= atrv * hedgeAdverseAtr
+hedgeShortSignal = hedgeMode != "OFF" and strategy.position_size > 0 and close < ema15Fast and ta.falling(ema15Fast, 2) and volumeReadyBear and (strategy.position_avg_price - close) >= atrv * hedgeAdverseAtr
+hedgeCloseLong = strategy.position_size < 0 and close < ema15Fast
+hedgeCloseShort = strategy.position_size > 0 and close > ema15Fast
+
+mainLongSignal = strategy.position_size <= 0 and entryReadyLong
+mainShortSignal = strategy.position_size >= 0 and entryReadyShort
+addLong = strategy.position_size > 0 and pullbackReadyLong and volumeReadyBull and bodyReadyBull and canLongEntry and math.abs(close - strategy.position_avg_price) > atrv * 0.8
+addShort = strategy.position_size < 0 and pullbackReadyShort and volumeReadyBear and bodyReadyBear and canShortEntry and math.abs(close - strategy.position_avg_price) > atrv * 0.8
+
+currentBlockedReason = "none"
+if biasNeutral
+    currentBlockedReason := "no_bias"
+else if (strategy.position_size > 0 and hedgeShortSignal) or (strategy.position_size < 0 and hedgeLongSignal)
+    currentBlockedReason := "hedge_only_state"
+else if (biasBull and not volumeReadyBull) or (biasBear and not volumeReadyBear)
+    currentBlockedReason := "low_volume"
+else if (biasBull and not bodyReadyBull) or (biasBear and not bodyReadyBear)
+    currentBlockedReason := "weak_body"
+else if (biasBull and not notExtendedLong) or (biasBear and not notExtendedShort)
+    currentBlockedReason := "too_extended"
+else if (biasBull and not canLongEntry) or (biasBear and not canShortEntry)
+    currentBlockedReason := "cooldown"
+
+if mainLongSignal
+    strategy.entry("MAIN_LONG", strategy.long, qty=baseQty, alert_message="buy,{{ticker}},1,{{close}},regime=bull,role=main,hedge=0,tf=15")
+    lastLongEntryBar := bar_index
+if mainShortSignal
+    strategy.entry("MAIN_SHORT", strategy.short, qty=baseQty, alert_message="sell,{{ticker}},1,{{close}},regime=bear,role=main,hedge=0,tf=15")
+    lastShortEntryBar := bar_index
+if addLong
+    strategy.entry("MAIN_LONG_ADD", strategy.long, qty=baseQty, alert_message="buy,{{ticker}},1,{{close}},regime=bull,role=main,hedge=0,tf=15")
+    lastLongEntryBar := bar_index
+if addShort
+    strategy.entry("MAIN_SHORT_ADD", strategy.short, qty=baseQty, alert_message="sell,{{ticker}},1,{{close}},regime=bear,role=main,hedge=0,tf=15")
+    lastShortEntryBar := bar_index
+
+if strategy.position_size > 0
+    strategy.exit("MAIN_LONG_EXIT", "MAIN_LONG", stop=close - atrv * trailAtrMult, alert_message="close,{{ticker}},1,{{close}},role=main_close")
+if strategy.position_size < 0
+    strategy.exit("MAIN_SHORT_EXIT", "MAIN_SHORT", stop=close + atrv * trailAtrMult, alert_message="close,{{ticker}},1,{{close}},role=main_close")
+
+alertcondition(mainLongSignal, title="Main Long", message="buy,{{ticker}},1,{{close}},regime=bull,role=main,hedge=0,tf=15")
+alertcondition(mainShortSignal, title="Main Short", message="sell,{{ticker}},1,{{close}},regime=bear,role=main,hedge=0,tf=15")
+alertcondition(hedgeShortSignal, title="Defensive Short Hedge", message="sell,{{ticker}},0.25,{{close}},regime=bull,role=hedge,hedge=0.25,tf=15")
+alertcondition(hedgeLongSignal, title="Defensive Long Hedge", message="buy,{{ticker}},0.25,{{close}},regime=bear,role=hedge,hedge=0.25,tf=15")
+alertcondition(hedgeCloseLong or hedgeCloseShort, title="Hedge Close", message="close,{{ticker}},0.25,{{close}},role=hedge_close")
+
+plot(ema15Fast, "EMA 15m Fast", color=color.new(color.green, 0), linewidth=2)
+plot(ema15Slow, "EMA 15m Slow", color=color.new(color.teal, 0), linewidth=1)
+plot(ema60Fast, "EMA 60m Fast", color=color.new(color.orange, 0), linewidth=2)
+plot(ema60Slow, "EMA 60m Slow", color=color.new(color.yellow, 0), linewidth=1)
+plot(ema240Trend, "EMA 240m Trend", color=color.new(color.red, 0), linewidth=2)
+plotshape(mainLongSignal, title="Main Long Signal", style=shape.triangleup, location=location.belowbar, color=color.new(color.green, 0), size=size.tiny, text="L")
+plotshape(mainShortSignal, title="Main Short Signal", style=shape.triangledown, location=location.abovebar, color=color.new(color.red, 0), size=size.tiny, text="S")
+plotshape(hedgeShortSignal, title="Short Hedge Signal", style=shape.circle, location=location.abovebar, color=color.new(color.red, 0), size=size.tiny, text="H")
+plotshape(hedgeLongSignal, title="Long Hedge Signal", style=shape.circle, location=location.belowbar, color=color.new(color.green, 0), size=size.tiny, text="H")
+bgcolor(biasBull ? color.new(color.green, 90) : biasBear ? color.new(color.red, 90) : color.new(color.gray, 92))
+
+var table status = table.new(position.top_right, 1, 6)
+if barstate.islast
+    biasText = biasBull ? "bull" : biasBear ? "bear" : "neutral"
+    entryReadyText = (entryReadyLong or entryReadyShort) ? "yes" : "no"
+    volumeReadyText = ((biasBull and volumeReadyBull) or (biasBear and volumeReadyBear)) ? "yes" : "no"
+    pullbackReadyText = ((biasBull and pullbackReadyLong) or (biasBear and pullbackReadyShort)) ? "yes" : "no"
+    hedgeText = hedgeMode == "OFF" ? "off" : ((hedgeShortSignal or hedgeLongSignal) ? "armed" : "idle")
+    table.cell(status, 0, 0, "bias: " + biasText)
+    table.cell(status, 0, 1, "entry_ready: " + entryReadyText)
+    table.cell(status, 0, 2, "volume_ready: " + volumeReadyText + " (" + str.tostring(volumeRatio, "#.##") + ")")
+    table.cell(status, 0, 3, "pullback_ready: " + pullbackReadyText)
+    table.cell(status, 0, 4, "blocked_reason: " + currentBlockedReason)
+    table.cell(status, 0, 5, "hedge: " + hedgeText)

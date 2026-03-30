@@ -1,0 +1,112 @@
+//@version=5
+indicator("Low Leverage Hedge Indicator v1", overlay=true)
+
+trendModel = input.string("VWAP_EMA", "Trend Model", options=["EMA", "STRUCTURE", "VWAP_EMA"])
+volumeModel = input.string("OBV_CONFIRM", "Volume Model", options=["VOL_EMA_MULT", "RELATIVE_VOLUME", "OBV_CONFIRM"])
+hedgeMode = input.string("DEFENSIVE_ONLY", "Hedge Mode", options=["DEFENSIVE_ONLY", "OFF"])
+qualityPreset = input.string("conservative", "Quality Preset", options=["conservative", "balanced"])
+
+atrLen = input.int(14, "ATR Length", minval=1)
+ema15FastLen = input.int(20, "15m Fast EMA", minval=1)
+ema15SlowLen = input.int(50, "15m Slow EMA", minval=1)
+ema60FastLen = input.int(20, "60m Fast EMA", minval=1)
+ema60SlowLen = input.int(50, "60m Slow EMA", minval=1)
+ema240TrendLen = input.int(50, "240m Trend EMA", minval=1)
+volumeEmaLen = input.int(20, "Volume EMA Length", minval=1)
+structureLookback = input.int(3, "Structure Lookback", minval=1)
+obvEmaLen = input.int(20, "OBV EMA Length", minval=1)
+
+atrv = ta.atr(atrLen)
+ema15Fast = ta.ema(close, ema15FastLen)
+ema15Slow = ta.ema(close, ema15SlowLen)
+ema60Fast = request.security(syminfo.tickerid, "60", ta.ema(close, ema60FastLen), barmerge.gaps_off, barmerge.lookahead_off)
+ema60Slow = request.security(syminfo.tickerid, "60", ta.ema(close, ema60SlowLen), barmerge.gaps_off, barmerge.lookahead_off)
+ema240Trend = request.security(syminfo.tickerid, "240", ta.ema(close, ema240TrendLen), barmerge.gaps_off, barmerge.lookahead_off)
+close240 = request.security(syminfo.tickerid, "240", close, barmerge.gaps_off, barmerge.lookahead_off)
+high60 = request.security(syminfo.tickerid, "60", high, barmerge.gaps_off, barmerge.lookahead_off)
+low60 = request.security(syminfo.tickerid, "60", low, barmerge.gaps_off, barmerge.lookahead_off)
+vwapNow = ta.vwap(hlc3)
+volEma = ta.ema(volume, volumeEmaLen)
+volumeRatio = volEma > 0 ? volume / volEma : 0.0
+bodyRatio = atrv > 0 ? math.abs(close - open) / atrv : 0.0
+obv = ta.cum(math.sign(ta.change(close)) * volume)
+obvEma = ta.ema(obv, obvEmaLen)
+
+regimeBars = qualityPreset == "conservative" ? 2 : 1
+pullbackToleranceAtr = qualityPreset == "conservative" ? 0.30 : 0.40
+extensionLimitAtr = qualityPreset == "conservative" ? 0.70 : 0.95
+minBodyAtr = qualityPreset == "conservative" ? 0.20 : 0.15
+volumePullbackMult = qualityPreset == "conservative" ? 1.10 : 1.00
+
+emaBullBias = close > ema60Fast and ema60Fast > ema60Slow and ema60Slow > ema240Trend
+emaBearBias = close < ema60Fast and ema60Fast < ema60Slow and ema60Slow < ema240Trend
+structureBullBias = high60 > high60[structureLookback] and low60 > low60[structureLookback] and close240 >= close240[1]
+structureBearBias = high60 < high60[structureLookback] and low60 < low60[structureLookback] and close240 <= close240[1]
+vwapBullBias = close > vwapNow and ema60Fast > ema60Slow and ema60Slow > ema240Trend
+vwapBearBias = close < vwapNow and ema60Fast < ema60Slow and ema60Slow < ema240Trend
+
+biasBull = switch trendModel
+    "STRUCTURE" => structureBullBias
+    "VWAP_EMA" => vwapBullBias
+    => emaBullBias
+biasBear = switch trendModel
+    "STRUCTURE" => structureBearBias
+    "VWAP_EMA" => vwapBearBias
+    => emaBearBias
+biasBull := biasBull and not biasBear
+biasBear := biasBear and not biasBull
+biasNeutral = not biasBull and not biasBear
+bullConfirmed = biasBull and ta.barssince(not biasBull) >= regimeBars - 1
+bearConfirmed = biasBear and ta.barssince(not biasBear) >= regimeBars - 1
+
+volumeReadyBull = switch volumeModel
+    "RELATIVE_VOLUME" => volume >= ta.highest(volume, volumeEmaLen)[1] * 0.75
+    "OBV_CONFIRM" => obv > obvEma and volumeRatio >= 0.9
+    => volumeRatio >= volumePullbackMult
+volumeReadyBear = switch volumeModel
+    "RELATIVE_VOLUME" => volume >= ta.highest(volume, volumeEmaLen)[1] * 0.75
+    "OBV_CONFIRM" => obv < obvEma and volumeRatio >= 0.9
+    => volumeRatio >= volumePullbackMult
+
+bodyReadyBull = close > open and bodyRatio >= minBodyAtr
+bodyReadyBear = close < open and bodyRatio >= minBodyAtr
+notExtendedLong = close >= ema15Fast and (close - ema15Fast) <= atrv * extensionLimitAtr
+notExtendedShort = close <= ema15Fast and (ema15Fast - close) <= atrv * extensionLimitAtr
+pullbackReadyLong = bullConfirmed and ema15Fast > ema15Slow and ta.rising(ema15Fast, 2) and low <= ema15Fast + atrv * pullbackToleranceAtr and close > ema15Fast and notExtendedLong
+pullbackReadyShort = bearConfirmed and ema15Fast < ema15Slow and ta.falling(ema15Fast, 2) and high >= ema15Fast - atrv * pullbackToleranceAtr and close < ema15Fast and notExtendedShort
+entryReady = (biasBull and pullbackReadyLong and volumeReadyBull and bodyReadyBull) or (biasBear and pullbackReadyShort and volumeReadyBear and bodyReadyBear)
+hedgeState = hedgeMode == "OFF" ? "off" : "armed"
+
+blockedReason = "none"
+if biasNeutral
+    blockedReason := "no_bias"
+else if (biasBull and not volumeReadyBull) or (biasBear and not volumeReadyBear)
+    blockedReason := "low_volume"
+else if (biasBull and not bodyReadyBull) or (biasBear and not bodyReadyBear)
+    blockedReason := "weak_body"
+else if (biasBull and not notExtendedLong) or (biasBear and not notExtendedShort)
+    blockedReason := "too_extended"
+else if not entryReady
+    blockedReason := "cooldown"
+
+plot(ema15Fast, "EMA 15m Fast", color=color.new(color.green, 0), linewidth=2)
+plot(ema15Slow, "EMA 15m Slow", color=color.new(color.teal, 0), linewidth=1)
+plot(ema60Fast, "EMA 60m Fast", color=color.new(color.orange, 0), linewidth=2)
+plot(ema60Slow, "EMA 60m Slow", color=color.new(color.yellow, 0), linewidth=1)
+plot(ema240Trend, "EMA 240m Trend", color=color.new(color.red, 0), linewidth=2)
+bgcolor(biasBull ? color.new(color.green, 90) : biasBear ? color.new(color.red, 90) : color.new(color.gray, 92))
+
+var table status = table.new(position.top_right, 1, 6)
+if barstate.islast
+    biasText = biasBull ? "bull" : biasBear ? "bear" : "neutral"
+    volumeReadyText = ((biasBull and volumeReadyBull) or (biasBear and volumeReadyBear)) ? "yes" : "no"
+    pullbackReadyText = ((biasBull and pullbackReadyLong) or (biasBear and pullbackReadyShort)) ? "yes" : "no"
+    table.cell(status, 0, 0, "bias: " + biasText)
+    table.cell(status, 0, 1, "trend_model: " + trendModel)
+    table.cell(status, 0, 2, "volume_model: " + volumeModel)
+    table.cell(status, 0, 3, "vol_ratio: " + str.tostring(volumeRatio, "#.##"))
+    table.cell(status, 0, 4, "blocked_reason: " + blockedReason)
+    table.cell(status, 0, 5, "hedge: " + hedgeState)
+
+alertcondition(biasBull, title="Bull Bias", message="buy,{{ticker}},1,{{close}},regime=bull,role=main,hedge=0,tf=15")
+alertcondition(biasBear, title="Bear Bias", message="sell,{{ticker}},1,{{close}},regime=bear,role=main,hedge=0,tf=15")
